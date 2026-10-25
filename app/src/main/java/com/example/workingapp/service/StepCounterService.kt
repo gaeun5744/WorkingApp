@@ -1,7 +1,6 @@
 package com.example.workingapp.service
 
 import android.Manifest
-import android.app.ForegroundServiceStartNotAllowedException
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -68,7 +67,9 @@ class StepCounterService : LifecycleService() {
             return try {
                 ContextCompat.startForegroundService(context, Intent(context, StepCounterService::class.java))
                 true
-            } catch (e: ForegroundServiceStartNotAllowedException) {
+            } catch (e: IllegalStateException) {
+                // API 31+ 의 ForegroundServiceStartNotAllowedException 은 IllegalStateException 의 하위 클래스다.
+                // minSdk 30 에는 그 클래스가 없어 부모 타입으로 잡는다.
                 Timber.w(e, "Foreground Service 시작 불가")
                 false
             }
