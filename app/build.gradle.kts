@@ -24,6 +24,9 @@ android {
         // Phase A: 모든 빌드가 앱 내부 MockApiInterceptor 로 응답한다 (PRD Q18). M10 에서 실제 서버로 전환.
         buildConfigField("boolean", "USE_MOCK_API", "true")
         buildConfigField("String", "BASE_URL", "\"https://mock.workingapp.local/\"")
+        // 하드웨어 걸음 센서가 없는 에뮬레이터 검증용: ./gradlew assembleDebug -PfakeStepSensor=true
+        val fakeStepSensor = providers.gradleProperty("fakeStepSensor").orNull?.toBoolean() ?: false
+        buildConfigField("boolean", "USE_FAKE_STEP_SENSOR", "$fakeStepSensor")
     }
 
     buildTypes {
@@ -37,10 +40,18 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+    sourceSets {
+        // Room 스키마 이력 — 마이그레이션 테스트에서 사용
+        getByName("androidTest").assets.directories.add("$projectDir/schemas")
+    }
     buildFeatures {
         compose = true
         buildConfig = true
     }
+}
+
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
 }
 
 dependencies {
@@ -73,6 +84,17 @@ dependencies {
     implementation(libs.okhttp.logging)
     implementation(libs.kotlinx.serialization.json)
 
+    // Room
+    implementation(libs.room.runtime)
+    implementation(libs.room.ktx)
+    ksp(libs.room.compiler)
+
+    // Background: Foreground Service(LifecycleService), WorkManager + Hilt Worker
+    implementation(libs.androidx.lifecycle.service)
+    implementation(libs.androidx.work.runtime.ktx)
+    implementation(libs.hilt.work)
+    ksp(libs.hilt.androidx.compiler)
+
     implementation(libs.kotlinx.collections.immutable)
     implementation(libs.timber)
 
@@ -82,6 +104,7 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.kotlinx.coroutines.test)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
 }

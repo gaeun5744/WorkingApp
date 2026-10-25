@@ -5,7 +5,7 @@
 > Android 작업은 `.agents/AGENTS.md` 지침을, 서버 작업은 `.agents/llm-rules/server/`(Phase B에서 작성) 지침을 따른다.
 
 - 구현 순서 (PRD Q17): **Phase A — 앱을 Mock 서버로 완성** → **Phase B — 실제 서버 구현 후 전환**
-- 브랜치 전략: `main`(릴리스 가능한 상태) ← `develop`(통합) ← `feature/*`(기능 단위)
+- 브랜치 전략: `main`(릴리스 가능한 상태) ← `develop`(통합) ← `feature/*`(마일스톤 단위). 각 마일스톤이 끝나면 `develop`에 `--no-ff` 머지 후 다음 브랜치를 딴다.
 - 커밋 메시지 설명은 한국어로 작성하고, 커밋/푸시는 명시적으로 요청할 때만 한다.
 - 저장소 구조: 루트 = Android 앱(`:app`), `server/` = 독립 Gradle 프로젝트(Phase B). DTO는 공유하지 않고 `docs/api.md`가 계약의 기준.
 
@@ -97,34 +97,38 @@ worker               WorkManager Worker                     ← 지침 확장
 
 ---
 
-## M2. 걸음 측정 & 로컬 저장 (`feature/step-sensor`, `feature/local-db`)
+## M2. 걸음 측정 & 로컬 저장 (`feature/m2-step-sensor`) ✅
 
-### 2-1. 누적값 → 일별 걸음 수 변환 (`domain/step`) ★
-- [ ] 센서 누적값과 "오늘 0시(KST) 기준값(baseline)"의 차이로 오늘 걸음 계산
-- [ ] **재부팅 감지**: 현재 누적값 < 마지막 저장값이면 baseline 보정
-- [ ] **자정 경계**: 날짜가 바뀌면 이전 날짜 확정 후 새 baseline
-- [ ] 시간대별(hourly) 걸음 집계 (서버 검증용 업로드 데이터)
-- [ ] 기기 시간/시간대 변경 시에도 KST 기준으로 계산
-- [ ] `Clock` 주입, **단위 테스트로 엣지 케이스 먼저 검증** (`./gradlew testDebugUnitTest`)
+설계 결정과 대안은 `docs/architecture.md` §3.
+
+### 2-1. 누적값 → 걸음 변환 (`domain/step`) ★
+- [x] 측정마다 증분(현재 − 직전)을 측정 시각(KST)의 날짜·시간대에 더하는 `StepDeltaCalculator` (baseline 방식 대신)
+- [x] **재부팅 감지**: `BOOT_COUNT` 비교 우선, 알 수 없으면 값 감소로 판정
+- [x] **늦게 도착한 측정**: 같은 부팅인데 값이 줄면 무시
+- [x] **자정 경계**: 측정 시각 기준으로 날짜가 정해져 별도 리셋 불필요
+- [x] 시간대별(hourly) 걸음 집계
+- [x] 기기 시간대와 무관하게 KST 기준 계산
+- [x] 단위 테스트 먼저 작성 (`StepDeltaCalculatorTest` 8개)
 
 ### 2-2. 센서 & 백그라운드 측정
-- [ ] `data/sensor/StepDataSource` 인터페이스 + STEP_COUNTER 구현체 + `FakeStepDataSource`
-- [ ] Foreground Service(`foregroundServiceType="health"`) + 상시 알림에 오늘 걸음 표시 (OS 요구사항, 그 외 알림은 비범위)
-- [ ] `BOOT_COMPLETED` 수신 시 서비스 재시작
-- [ ] WorkManager 15분 주기 스냅샷 (서비스가 죽었을 때 대비)
-- [ ] 센서 배칭(`maxReportLatencyUs`)으로 배터리 절약
-- [ ] 권한: `ACTIVITY_RECOGNITION`, `FOREGROUND_SERVICE_HEALTH` (+ 상시 알림 표시용 `POST_NOTIFICATIONS`)
-  - 권한 요청은 UiState에 섞지 않고 별도 effect로 분리
-  - 권한 거부 / 센서 미지원 상태 UI
-- [ ] 검증: 실제 기기에서 강제 종료·재부팅 후 걸음 유지 수동 확인
+- [x] `StepDataSource` + `AndroidStepDataSource`(STEP_COUNTER, 배칭 30초, 측정 시각 보정) + `SimulatedStepDataSource`(`-PfakeStepSensor=true`)
+- [x] `StepCounterService`(FGS type=health) + 상시 알림 "오늘 N걸음"
+- [x] `BootCompletedReceiver`: 재부팅·앱 업데이트 후 서비스 재시작
+- [x] `StepSnapshotWorker` 15분 주기 (HiltWorkerFactory)
+- [x] 권한: `ACTIVITY_RECOGNITION`, `FOREGROUND_SERVICE_HEALTH`, `POST_NOTIFICATIONS`, `RECEIVE_BOOT_COMPLETED`
+  - 권한 요청은 Route에서 처리하고 ViewModel에는 결과만 전달
+  - 1차 홈 화면: 오늘 걸음 / 권한 필요 / 센서 미지원 / 로딩
+- [x] 검증: 에뮬레이터에서 강제 종료·재부팅 후 걸음 유지 (`docs/architecture.md` §3 검증)
+- [x] 실제 기기(SM-S916N, STEP_COUNTER 하드웨어)에서 사용자가 직접 설치·확인 — 권한 허용, FGS(type=health) 실행, 크래시 없음
 
 ### 2-3. 로컬 저장소
-- [ ] Room: `daily_steps(date PK, steps, goal, updated_at, synced)`, `hourly_steps(date, hour, steps)`, `sensor_snapshot(timestamp, raw_value)`
-- [ ] Entity → Domain은 `toDomain()` 매퍼 경유
-- [ ] `data/di/DatabaseModule` (`@Singleton`)
-- [ ] DataStore: 목표 걸음 수, 마지막 baseline, 토큰
-- [ ] 스냅샷 7일 후 정리
-- [ ] 테스트: Room in-memory DB
+- [x] Room: `daily_steps(date, steps, updated_at, synced)`, `hourly_steps(date, hour, steps)`, `counter_checkpoint`(1행)
+- [x] 증분과 체크포인트를 `withTransaction`으로 함께 저장
+- [x] Entity → Domain 매퍼
+- [x] `DatabaseModule` (`@Singleton`), 스키마 `app/schemas/` 내보내기
+- [x] 계측 테스트: `StepRepositoryImplTest` 4개 (Room in-memory, 동시 기록 포함)
+- 변경: baseline은 체크포인트로 대체되어 DataStore 불필요 → DataStore는 토큰(M3)·목표 걸음(M4)에서 도입. `sensor_snapshot` 테이블은 두지 않음.
+- 목표 걸음(`goal`)은 M4에서 설정 기능과 함께 추가
 
 ---
 
