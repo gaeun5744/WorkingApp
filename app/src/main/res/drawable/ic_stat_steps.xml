@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 상태바 알림용 단색 아이콘 (발자국) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M8,2C6.3,2 5,4.2 5,7c0,2.3 0.9,3.6 1.4,4.5L6,14h4l-0.4,-2.5C10.1,10.6 11,9.3 11,7C11,4.2 9.7,2 8,2zM6,15.5C6,17.4 6.9,19 8,19s2,-1.6 2,-3.5V15H6V15.5zM16,6c-1.7,0 -3,2.2 -3,5c0,2.3 0.9,3.6 1.4,4.5L14,18h4l-0.4,-2.5C18.1,14.6 19,13.3 19,11C19,8.2 17.7,6 16,6zM14,19.5c0,1.9 0.9,3.5 2,3.5s2,-1.6 2,-3.5V19h-4V19.5z" />
+</vector>

@@ -24,13 +24,17 @@
 | `data/remote/api` | Retrofit `PedometerApi` (`docs/api.md`의 코드 표현) | M1 ✅ |
 | `data/remote/dto` | `@Serializable` DTO (+ M3부터 `toDomain()` 매퍼) | M1 ✅ |
 | `data/remote/mock` | Mock 서버 (Phase A 전용) | M1 ✅ |
-| `data/di` | Hilt 모듈: `NetworkModule`, `TimeModule`, `MockApiModule` (+ `DatabaseModule`, `RepositoryModule`) | M1 일부 ✅ |
-| `data/local/*`, `data/sensor`, `data/repository` | Room, 센서, Repository 구현체 | M2~ |
-| `domain/model`, `domain/repository`, `domain/step` | 도메인 모델, Repository 인터페이스, 걸음 계산 | M2~ |
+| `data/di` | Hilt 모듈: `NetworkModule`, `TimeModule`, `MockApiModule`, `DatabaseModule`, `SensorModule`, `RepositoryModule` | M2 ✅ |
+| `data/local` | `WorkingAppDatabase`, `dao/StepDao`, `entity/*` (+ 매퍼) | M2 ✅ |
+| `data/sensor` | `StepDataSource` + `AndroidStepDataSource`(STEP_COUNTER) / `SimulatedStepDataSource`(에뮬레이터) | M2 ✅ |
+| `data/repository` | `StepRepositoryImpl` | M2 ✅ |
+| `domain/model`, `domain/repository`, `domain/step` | `StepReading`·`DailySteps`, `StepRepository`, `StepDeltaCalculator` | M2 ✅ |
+| `presentation/home` | 1차 홈 (오늘 걸음, 권한·센서 미지원 상태) — M4에서 확장 | M2 ✅ |
 | `presentation/nav` | `NavKeys.kt`, `AppNavHost.kt` (Navigation 3) | M1 ✅ |
 | `presentation/text` | `UiText` + `asString()` (i18n-safe 메시지) | M1 ✅ |
 | `presentation/placeholder` | 화면 골격용 임시 화면 — 실제 화면이 생기면 삭제 | M1 (임시) |
-| `service`, `worker` | Foreground Service, WorkManager | M2~ |
+| `service` | `StepCounterService`(FGS type=health), `BootCompletedReceiver`, `StepNotificationFactory` | M2 ✅ |
+| `worker` | `StepSnapshotWorker` (15분 주기) | M2 ✅ |
 
 ### 지침에 없는 패키지를 추가한 이유
 
@@ -42,7 +46,43 @@
 - `service`, `worker`: 앱이 꺼져 있어도 측정·동기화
 - `data/remote/mock`: 서버 없이 앱을 먼저 완성 (PRD Q17·Q18)
 
-## 3. Mock 서버 (Phase A)
+## 3. 걸음 측정 (M2)
+
+```
+STEP_COUNTER ─(배칭 30초)→ AndroidStepDataSource ─┐
+                                                   ├→ StepRepository.record() ─ withTransaction {
+StepCounterService (FGS, 상시 구독) ───────────────┤      체크포인트 읽기 → StepDeltaCalculator → 일별·시간대별 += 증분, 체크포인트 갱신 }
+StepSnapshotWorker (15분, 1회 읽기) ───────────────┘
+BootCompletedReceiver → 재부팅·앱 업데이트 후 StepCounterService 재시작
+```
+
+### 설계 결정 (선택하지 않은 대안 포함)
+
+| 결정 | 선택 | 선택하지 않은 대안 → 이유 |
+|---|---|---|
+| 누적값 → 걸음 변환 | **측정마다 증분(현재 − 직전)을 측정 시각의 (날짜, 시간대)에 더함** | 0시 baseline 차이: 자정마다 baseline을 다시 잡아야 하고, 시간대별 집계가 따로 필요하며, 재부팅 시 baseline 보정이 복잡하다. 증분 방식은 자정 처리와 hourly 집계가 저절로 해결된다. |
+| 재부팅 판정 | **`Settings.Global.BOOT_COUNT` 비교 우선, 읽을 수 없으면 값 감소로 판정** | 값 감소만 보기: 재부팅 후 첫 측정 전에 직전 값보다 많이 걸으면 재부팅을 놓쳐 걸음이 덜 세진다. |
+| 늦게 도착한 측정 | **같은 부팅인데 값이 줄면 무시** (기준도 유지) | 재부팅으로 처리: 서비스·워커의 측정 순서가 뒤바뀌면 누적값 전체가 다시 더해져 수천 보가 중복된다. |
+| 체크포인트 저장 위치 | **Room, 증분과 같은 트랜잭션** | DataStore(TODO 초안): 걸음 저장과 체크포인트 저장 사이에 앱이 죽으면 다음 측정에서 같은 증분이 또 더해진다. |
+| 동시 기록 보호 | **`withTransaction` 안에서 읽기→계산→쓰기** | Repository 안 `Mutex`: 같은 프로세스만 보호하고 DB 일관성은 보장하지 않는다. |
+| 측정 시각 | **`SensorEvent.timestamp`(부팅 후 ns)로 배칭 지연을 보정** | 콜백 받은 시각: 최대 30초 배칭만큼 늦게 기록돼 시간대·자정 경계가 어긋난다. |
+| 시간 변경 브로드캐스트 | **처리하지 않음** — 모든 날짜 계산이 주입된 KST `Clock` 기준 | `ACTION_TIME_CHANGED`/`TIMEZONE_CHANGED` 수신: 기기 시간대와 무관하게 KST로 계산하므로 필요 없다. 기기 시계 조작 자체는 서버가 판정한다 (PRD Q6). |
+| 에뮬레이터 센서 | **`SimulatedStepDataSource`** (부팅 후 경과 시간 = 누적값, `-PfakeStepSensor=true`) | 항상 Fake 사용: 센서 미지원 UI를 확인할 수 없다. 프로세스 메모리 카운터: 재부팅·강제 종료 시나리오를 실제 센서처럼 재현하지 못한다. |
+| 센서 스냅샷 테이블 | **두지 않음** — 체크포인트 1행으로 충분 | TODO 초안의 `sensor_snapshot`: 증분 방식에서는 재계산에 쓰이지 않는다. |
+
+### 알려진 한계
+- 두 측정 사이에 자정이 끼면 증분 전체가 뒤 측정 날짜로 들어간다. 배칭(30초)·15분 워커로 간격을 짧게 유지해 오차를 줄인다.
+- 재부팅 직전 마지막 측정 이후의 몇 걸음은 잃을 수 있다 (실제 센서도 종료 시점까지의 배칭분을 보장하지 않음).
+- 서비스·워커가 모두 멈춘 채 오래 지나면 그동안의 걸음이 다음 측정 시각 하나에 몰린다. 서버의 시간당 상한(PRD Q9)이 비정상치로 표시한다.
+
+### 검증 (에뮬레이터 Pixel 8 API 37, 시뮬레이션 센서)
+- 권한 허용 → FGS(type=health) 실행, 상시 알림 "오늘 N걸음" 갱신
+- 강제 종료 20초 후 재실행: 종료 동안의 걸음까지 반영 (92 → 117)
+- 재부팅(BOOT_COUNT 2→3): 앱을 열지 않아도 서비스 자동 재시작, 133 → 161로 중복·누락 없이 이어짐
+- `StepSnapshotWorker` 예정 실행: `Worker result SUCCESS` (HiltWorkerFactory 연결 확인)
+- 단위 테스트 `StepDeltaCalculatorTest` 8개, 계측 테스트 `StepRepositoryImplTest` 4개 (동시 기록 20회 → 1회만 반영 포함)
+
+## 4. Mock 서버 (Phase A)
 
 ```
 PedometerApi(Retrofit) → OkHttpClient
@@ -70,8 +110,10 @@ PedometerApi(Retrofit) → OkHttpClient
 2. `AndroidManifest.xml`에 `INTERNET` 권한 추가 (Mock은 실제 네트워크를 쓰지 않아 지금은 없음)
 3. `docs/api.md` 기준으로 Mock과 서버 응답 차이 점검
 
-## 4. 빌드 메모
+## 5. 빌드 메모
 
 - AGP 9 내장 Kotlin + KSP 2.0.x 조합 때문에 `gradle.properties`에 `android.disallowKotlinSourceSets=false`가 필요하다 (실험적 옵션 경고가 뜨는 것은 정상). KSP가 `android.sourceSets` 방식을 지원하면 제거한다.
 - Hilt 2.60 생성 코드가 `@CanIgnoreReturnValue`를 참조해 `error_prone_annotations`를 `compileOnly`로 추가했다.
 - Navigation 3의 `ResultEventBus`는 1.2.0-alpha 라인에만 있어 alpha 버전을 쓴다.
+- Room 스키마는 `app/schemas/`에 내보낸다 (마이그레이션 테스트용, 커밋 대상).
+- `connectedDebugAndroidTest`는 연결된 **모든 기기**에서 실행된다. 에뮬레이터만 쓰려면 `ANDROID_SERIAL=emulator-5554`를 지정한다.
