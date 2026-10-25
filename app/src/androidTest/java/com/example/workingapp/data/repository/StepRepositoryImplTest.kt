@@ -4,9 +4,12 @@ import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.example.workingapp.data.local.SessionStore
 import com.example.workingapp.data.local.WorkingAppDatabase
+import com.example.workingapp.data.local.entity.DailyStepsEntity
 import com.example.workingapp.data.sensor.StepDataSource
 import com.example.workingapp.domain.model.StepReading
+import com.example.workingapp.testing.MockBackend
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -32,6 +35,10 @@ class StepRepositoryImplTest {
     private val clock = Clock.fixed(now, ZoneId.of("Asia/Seoul"))
     private lateinit var database: WorkingAppDatabase
     private lateinit var repository: StepRepositoryImpl
+    private lateinit var backend: MockBackend
+    private lateinit var account: AccountRepositoryImpl
+
+    private val context = ApplicationProvider.getApplicationContext<Context>()
 
     private val noSensor = object : StepDataSource {
         override val isAvailable = true
@@ -40,9 +47,12 @@ class StepRepositoryImplTest {
 
     @Before
     fun setUp() {
-        val context = ApplicationProvider.getApplicationContext<Context>()
         database = Room.inMemoryDatabaseBuilder(context, WorkingAppDatabase::class.java).build()
-        repository = StepRepositoryImpl(database, noSensor, clock)
+        context.getSharedPreferences(SessionStore.PREFS_NAME, Context.MODE_PRIVATE).edit().clear().commit()
+        val sessionStore = SessionStore(context)
+        backend = MockBackend(clock, sessionStore, database.stepDao())
+        account = AccountRepositoryImpl(backend.api, sessionStore, backend.json)
+        repository = StepRepositoryImpl(database, noSensor, clock, backend.api, backend.json)
     }
 
     @After
@@ -79,6 +89,29 @@ class StepRepositoryImplTest {
         (1..20).map { async(Dispatchers.IO) { repository.record(reading(1_500)) } }.awaitAll()
 
         assertEquals(500, repository.observeTodaySteps().first().steps)
+    }
+
+    @Test
+    fun 미동기화_걸음을_올리고_동기화_완료로_표시한다() = runTest {
+        account.signUp("걷는토끼").getOrThrow()
+        repository.record(reading(1_000))
+        repository.record(reading(1_800))
+
+        repository.syncPendingSteps().getOrThrow()
+
+        assertEquals(800, backend.api.getTodayRewards().steps)
+        assertEquals(true, database.stepDao().getDaily("2026-10-25")?.synced)
+    }
+
+    @Test
+    fun 업로드하는_동안_걸음이_바뀌었으면_동기화_완료로_표시하지_않는다() = runTest {
+        database.stepDao().upsertDaily(DailyStepsEntity("2026-10-25", 500, updatedAtMillis = 2, synced = false))
+
+        // 업로드 직전에 읽은 값(updatedAt=1)과 지금 값(2)이 다르다
+        val updated = database.stepDao().markSynced("2026-10-25", updatedAtMillis = 1)
+
+        assertEquals(0, updated)
+        assertEquals(false, database.stepDao().getDaily("2026-10-25")?.synced)
     }
 
     @Test

@@ -16,4 +16,7 @@ interface StepRepository {
 
     /** 오늘(KST) 걸음. 자정이 지나면 새 날짜로 자동 전환된다. */
     fun observeTodaySteps(): Flow<DailySteps>
+
+    /** 최근 7일 중 미동기화 날짜를 서버에 올린다 (PRD Q5: 서버는 날짜별 max 로 반영하므로 재전송해도 안전). */
+    suspend fun syncPendingSteps(): Result<Unit>
 }

@@ -13,7 +13,7 @@
 
 | 영역 | 스택 |
 |---|---|
-| 앱 | 단일 모듈 `:app`, Kotlin, Compose(Material3), Hilt, Retrofit + OkHttp + kotlinx.serialization, Navigation 3 + `ResultEventBus`, Timber, Room, DataStore, WorkManager, Foreground Service |
+| 앱 | 단일 모듈 `:app`, Kotlin, Compose(Material3), Hilt, Retrofit + OkHttp + kotlinx.serialization, Navigation 3 + `ResultEventBus`, Timber, Room, SharedPreferences(세션), WorkManager, Foreground Service |
 | Mock 서버 (Phase A) | 앱 내부 OkHttp `MockApiInterceptor` (PRD Q18) |
 | 서버 (Phase B) | Spring Boot (Kotlin), Spring Data JPA + 네이티브 upsert, Flyway, PostgreSQL, Redis, JWT |
 | 인프라 (Phase B) | Docker Compose(로컬·운영 동일), VM 1대, Caddy(HTTPS), GitHub Actions |
@@ -38,7 +38,7 @@
   - Navigation 3, Retrofit, OkHttp, kotlinx.serialization
   - Timber, `kotlinx-collections-immutable`, `lifecycle-runtime-compose`
   - 테스트: `kotlinx-coroutines-test`
-  - Room·DataStore·WorkManager는 M2, Turbine은 M4, MockWebServer는 M3에서 실제로 쓸 때 추가 (최소 수정 원칙)
+  - Room·WorkManager는 M2, Turbine은 M4에서 실제로 쓸 때 추가 (최소 수정 원칙). DataStore·MockWebServer는 쓰지 않음 (M2·M3 변경 참고)
 - [x] `@HiltAndroidApp` Application(Timber 초기화 포함), `MainActivity`에 `@AndroidEntryPoint`
 - [x] `presentation/nav/AppNavHost.kt`에 `NavDisplay` + `rememberResultEventBusNavEntryDecorator()`
 - [x] `presentation/nav/NavKeys.kt`에 화면 키 정의 (온보딩 / 홈 / 기록 / 랭킹 / 지갑 / 동네 선택) — 각 화면은 `PlaceholderScreen`으로 임시 연결
@@ -127,22 +127,26 @@ worker               WorkManager Worker                     ← 지침 확장
 - [x] Entity → Domain 매퍼
 - [x] `DatabaseModule` (`@Singleton`), 스키마 `app/schemas/` 내보내기
 - [x] 계측 테스트: `StepRepositoryImplTest` 4개 (Room in-memory, 동시 기록 포함)
-- 변경: baseline은 체크포인트로 대체되어 DataStore 불필요 → DataStore는 토큰(M3)·목표 걸음(M4)에서 도입. `sensor_snapshot` 테이블은 두지 않음.
+- 변경: baseline은 체크포인트로 대체되어 DataStore 불필요 (토큰은 M3에서 SharedPreferences로 결정). `sensor_snapshot` 테이블은 두지 않음.
 - 목표 걸음(`goal`)은 M4에서 설정 기능과 함께 추가
 
 ---
 
-## M3. 인증 & 동기화 (Mock) (`feature/auth`, `feature/sync`)
+## M3. 인증 & 동기화 (Mock) (`feature/m3-auth-sync`) ✅
 
-- [ ] API 구현 순서 준수: DTO → Mapper → Domain → Repository 인터페이스 → 구현체 → DI → ViewModel → Screen
-- [ ] `data/di/NetworkModule`: `Json`, `OkHttpClient`(+ Mock 플래그 시 `MockApiInterceptor`), `Retrofit`, Api (`@Singleton`)
-- [ ] 온보딩: 첫 실행 시 익명 가입 + 닉네임 입력
-- [ ] 동네 선택 화면 → 결과는 `ResultEventBus`로 반환
-- [ ] OkHttp `Authenticator`로 401 시 리프레시 토큰 재발급, 실패 시 재가입 흐름
-- [ ] `worker/SyncWorker`(Hilt Worker): 15분 주기 + 앱 진입 시, 네트워크 조건, 지수 백오프
-- [ ] `synced` 플래그 기반 증분 업로드 (최근 7일)
-- [ ] 오류는 Repository에서 `Result`로 변환, UI에는 `UiText` (`llm-skills/android-error-handling.md`)
-- [ ] 검증: Mock 오류 주입 → 재시도 후 `synced` 반영, 401 → 재발급 흐름
+설계 결정과 대안은 `docs/architecture.md` §4, 재가입 정책은 PRD Q19.
+
+- [x] API 구현 순서 준수: DTO → Mapper → Domain → Repository 인터페이스 → 구현체 → DI → ViewModel → Screen
+- [x] `NetworkModule`: 일반 클라이언트(`AuthInterceptor` → Mock) + 갱신 전용 `@AuthClient` 클라이언트, `PedometerApi`에서 인증 헤더 파라미터 제거
+- [x] 온보딩: 첫 실행 시 닉네임 입력 → 익명 가입 → 동네 선택 → 홈 (중간에 껐다 켜면 동네 단계부터)
+- [x] 동네 선택 화면(검색 debounce + flatMapLatest) → 결과는 `ResultEventBus`로 반환
+- [x] 401 처리: `AuthInterceptor`에서 리프레시 → 거부 시 저장된 닉네임·동네로 조용히 재가입 + 걸음 재업로드 표시 (OkHttp `Authenticator` 대신 — Mock 401을 보지 못함)
+- [x] `StepSyncWorker`(Hilt Worker): 15분 주기 + 앱 시작·온보딩 완료 시, 네트워크 조건, 지수 백오프
+- [x] `synced` 플래그 기반 증분 업로드 (최근 7일), 업로드 중 변경 시 미표시
+- [x] 오류는 Repository에서 `AppError`로 변환, UI에는 `UiText`
+- [x] 검증: 계측 테스트(토큰 만료·재가입·동기화), 에뮬레이터에서 온보딩·Mock 재시작 재가입 흐름
+- 변경: 토큰 저장은 DataStore 대신 SharedPreferences (인터셉터의 동기 읽기, `runBlocking` 금지). MockWebServer 의존성은 Mock 인터셉터로 충분해 추가하지 않음.
+- 남음: 오류 주입(`failureRate`)으로 재시도 UI 확인은 화면별 재시도가 생기는 M4~M6에서 함께 확인
 
 ---
 

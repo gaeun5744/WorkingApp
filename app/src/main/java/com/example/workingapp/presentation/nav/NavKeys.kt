@@ -20,3 +20,6 @@ data object WalletKey : NavKey
 
 @Serializable
 data object RegionSelectKey : NavKey
+
+/** 동네 선택 화면 → 호출한 화면으로 돌려주는 결과 (`ResultEventBus`) */
+data class RegionResult(val id: Long, val name: String)

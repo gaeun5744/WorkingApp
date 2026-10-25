@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import com.example.workingapp.worker.StepSnapshotWorker
+import com.example.workingapp.worker.StepSyncWorker
 import dagger.hilt.android.HiltAndroidApp
 import timber.log.Timber
 import javax.inject.Inject
@@ -20,5 +21,7 @@ class WorkingApplication : Application(), Configuration.Provider {
         super.onCreate()
         if (BuildConfig.DEBUG) Timber.plant(Timber.DebugTree())
         StepSnapshotWorker.schedule(this)
+        StepSyncWorker.schedulePeriodic(this)
+        StepSyncWorker.syncNow(this)
     }
 }
