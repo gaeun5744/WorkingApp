@@ -111,7 +111,7 @@ worker               WorkManager Worker                     ← 지침 확장
 - [x] 단위 테스트 먼저 작성 (`StepDeltaCalculatorTest` 8개)
 
 ### 2-2. 센서 & 백그라운드 측정
-- [x] `StepDataSource` + `AndroidStepDataSource`(STEP_COUNTER, 배칭 30초, 측정 시각 보정) + `SimulatedStepDataSource`(`-PfakeStepSensor=true`)
+- [x] `StepDataSource` + `AndroidStepDataSource`(STEP_COUNTER, 배칭 없음 — 실기기 디버깅으로 변경, 측정 시각 보정) + `SimulatedStepDataSource`(`-PfakeStepSensor=true`)
 - [x] `StepCounterService`(FGS type=health) + 상시 알림 "오늘 N걸음"
 - [x] `BootCompletedReceiver`: 재부팅·앱 업데이트 후 서비스 재시작
 - [x] `StepSnapshotWorker` 15분 주기 (HiltWorkerFactory)
