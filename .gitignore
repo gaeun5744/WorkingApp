@@ -15,3 +15,7 @@
 local.properties
 
 .omc/
+/.idea/gradle.xml
+/.idea/inspectionProfiles/
+/.idea/markdown.xml
+/.idea/vcs.xml
