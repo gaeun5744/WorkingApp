@@ -33,17 +33,18 @@
 ## M1. 앱 기반 & API 계약 & Mock 서버 (`feature/app-setup`, `feature/mock-api`)
 
 ### 1-1. 프로젝트 기반 설정
-- [ ] 의존성 추가 (`gradle/libs.versions.toml`)
+- [x] 의존성 추가 (`gradle/libs.versions.toml`)
   - Hilt + `androidx.hilt:hilt-lifecycle-viewmodel-compose`
   - Navigation 3, Retrofit, OkHttp, kotlinx.serialization
-  - Room, DataStore, WorkManager
   - Timber, `kotlinx-collections-immutable`, `lifecycle-runtime-compose`
-  - 테스트: Turbine, MockWebServer
-- [ ] `@HiltAndroidApp` Application(Timber 초기화 포함), `MainActivity`에 `@AndroidEntryPoint`
-- [ ] `presentation/nav/AppNavHost.kt`에 `NavDisplay` + `rememberResultEventBusNavEntryDecorator()`
-- [ ] `presentation/nav/NavKeys.kt`에 화면 키 정의 (온보딩 / 홈 / 기록 / 랭킹 / 지갑 / 동네 선택)
-- [ ] 공통 `UiText`(i18n-safe 메시지 래퍼) 정의
-- [ ] 검증: `./gradlew :app:assembleDebug`
+  - 테스트: `kotlinx-coroutines-test`
+  - Room·DataStore·WorkManager는 M2, Turbine은 M4, MockWebServer는 M3에서 실제로 쓸 때 추가 (최소 수정 원칙)
+- [x] `@HiltAndroidApp` Application(Timber 초기화 포함), `MainActivity`에 `@AndroidEntryPoint`
+- [x] `presentation/nav/AppNavHost.kt`에 `NavDisplay` + `rememberResultEventBusNavEntryDecorator()`
+- [x] `presentation/nav/NavKeys.kt`에 화면 키 정의 (온보딩 / 홈 / 기록 / 랭킹 / 지갑 / 동네 선택) — 각 화면은 `PlaceholderScreen`으로 임시 연결
+- [x] 공통 `UiText`(i18n-safe 메시지 래퍼) 정의
+- [x] 검증: `./gradlew :app:assembleDebug`
+- [x] 에뮬레이터 실행 확인 (Pixel 8 API 37: 5개 화면 이동 + 뒤로가기, 크래시 없음)
 
 ### 1-2. 앱 패키지 구조 (`llm-rules/data/layer-contract.md` + 확장)
 
@@ -67,13 +68,14 @@ service              Foreground Service, BootReceiver       ← 지침 확장
 worker               WorkManager Worker                     ← 지침 확장
 ```
 
-- [ ] `docs/architecture.md`에 구성도, 지침 확장 근거, Mock → 실제 서버 전환 방법 기록
+- [x] `docs/architecture.md`에 구성도, 지침 확장 근거, Mock → 실제 서버 전환 방법 기록
 
 ### 1-3. API 계약 `docs/api.md` ★ (앱·Mock·서버 공통 기준)
-- [ ] 공통: 인증 헤더(`Authorization: Bearer`), 에러 응답 형식, 날짜 형식(KST `yyyy-MM-dd`)
-- [ ] 엔드포인트별 요청/응답·에러 코드
+- [x] 공통: 인증 헤더(`Authorization: Bearer`), 에러 응답 형식, 날짜 형식(KST `yyyy-MM-dd`)
+- [x] 엔드포인트별 요청/응답·에러 코드 + DTO·`PedometerApi`로 코드화
   - `POST /auth/anonymous` — 익명 가입 + 토큰 발급
   - `POST /auth/refresh` — 토큰 재발급
+  - `GET /me` — 내 정보 (동네 설정 여부 확인용, 작성 중 추가)
   - `GET /regions?query=` — 동네 검색
   - `PUT /me/region` — 내 동네 설정
   - `POST /steps/sync` — 날짜별 누적 + 시간대별 걸음 배치 업로드
@@ -83,15 +85,15 @@ worker               WorkManager Worker                     ← 지침 확장
   - `GET /ranking?period=daily|weekly` — 내 동네 랭킹 (상위 50 + 내 순위)
 
 ### 1-4. Mock 서버 (`data/remote/mock`)
-- [ ] `MockApiInterceptor`: 경로·메서드별로 `docs/api.md` 형식의 JSON 응답 생성
-- [ ] `BuildConfig.USE_MOCK_API` 플래그로 `NetworkModule`에서 Interceptor 장착 여부 결정 (debug = true)
-- [ ] 메모리 상태로 서버 규칙 흉내
+- [x] `MockApiInterceptor`: 경로·메서드별로 `docs/api.md` 형식의 JSON 응답 생성
+- [x] `BuildConfig.USE_MOCK_API` 플래그로 `NetworkModule`에서 Interceptor 장착 여부 결정 (Phase A는 모든 빌드 true)
+- [x] 메모리 상태로 서버 규칙 흉내
   - 걸음: 날짜별 `max(기존, 새 값)` 반영, 하루/시간당 상한 자르기
   - 리워드: `(date, tier)` 중복 수령 시 기존 결과 반환, 잔액·내역 갱신
   - 랭킹: 시드된 가짜 이웃 + 내 걸음으로 일간/주간 순위 계산
   - 토큰: 만료 시간을 짧게 설정해 401 → 재발급 흐름 재현
-- [ ] 디버그용 지연(예: 300~800ms)·오류 주입 설정 (오류 UI·재시도 확인용)
-- [ ] 단위 테스트: Mock 규칙 (멱등 upsert, 중복 수령)
+- [x] 디버그용 지연(예: 300~800ms)·오류 주입 설정 (오류 UI·재시도 확인용)
+- [x] 단위 테스트: Mock 규칙 (`MockApiTest` 13개 — 인증·멱등 upsert·상한·중복 수령·랭킹·오류 주입)
 
 ---
 

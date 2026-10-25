@@ -1,3 +1,10 @@
 <resources>
     <string name="app_name">WorkingApp</string>
+
+    <string name="screen_onboarding">시작하기</string>
+    <string name="screen_home">홈</string>
+    <string name="screen_history">기록</string>
+    <string name="screen_ranking">동네 랭킹</string>
+    <string name="screen_wallet">지갑</string>
+    <string name="screen_region_select">동네 선택</string>
 </resources>
