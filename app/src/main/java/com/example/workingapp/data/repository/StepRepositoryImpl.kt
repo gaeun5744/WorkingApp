@@ -6,6 +6,11 @@ import com.example.workingapp.data.local.entity.DailyStepsEntity
 import com.example.workingapp.data.local.entity.HourlyStepsEntity
 import com.example.workingapp.data.local.entity.toDomain
 import com.example.workingapp.data.local.entity.toEntity
+import com.example.workingapp.data.remote.api.PedometerApi
+import com.example.workingapp.data.remote.apiCall
+import com.example.workingapp.data.remote.dto.DailyStepsDto
+import com.example.workingapp.data.remote.dto.HourlyStepsDto
+import com.example.workingapp.data.remote.dto.StepsSyncRequest
 import com.example.workingapp.data.sensor.StepDataSource
 import com.example.workingapp.domain.model.DailySteps
 import com.example.workingapp.domain.model.StepReading
@@ -19,6 +24,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
+import kotlinx.serialization.json.Json
 import java.time.Clock
 import java.time.Duration
 import java.time.LocalDate
@@ -29,6 +35,8 @@ internal class StepRepositoryImpl @Inject constructor(
     private val database: WorkingAppDatabase,
     private val dataSource: StepDataSource,
     private val clock: Clock,
+    private val api: PedometerApi,
+    private val json: Json,
 ) : StepRepository {
 
     private val dao = database.stepDao()
@@ -78,7 +86,28 @@ internal class StepRepositoryImpl @Inject constructor(
         }
     }.distinctUntilChanged()
 
+    override suspend fun syncPendingSteps(): Result<Unit> {
+        val fromDate = LocalDate.now(clock).minusDays(SYNC_WINDOW_DAYS - 1).toString()
+        val pending = dao.getUnsyncedSince(fromDate)
+        if (pending.isEmpty()) return Result.success(Unit)
+
+        val request = StepsSyncRequest(
+            days = pending.map { day ->
+                DailyStepsDto(
+                    date = day.date,
+                    steps = day.steps,
+                    hourly = dao.getHourlyOf(day.date).map { HourlyStepsDto(it.hour, it.steps) },
+                )
+            },
+        )
+        return apiCall(json) { api.syncSteps(request) }.map {
+            // ACCEPTED·CAPPED·REJECTED 모두 서버가 처리를 끝낸 것이므로 다시 보낼 필요가 없다
+            pending.forEach { day -> dao.markSynced(day.date, day.updatedAtMillis) }
+        }
+    }
+
     private companion object {
         const val MIDNIGHT_MARGIN_MILLIS = 1_000L
+        const val SYNC_WINDOW_DAYS = 7L
     }
 }

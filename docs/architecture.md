@@ -21,20 +21,25 @@
 
 | 패키지 | 역할 | 상태 |
 |---|---|---|
-| `data/remote/api` | Retrofit `PedometerApi` (`docs/api.md`의 코드 표현) | M1 ✅ |
+| `data/remote/api` | Retrofit `PedometerApi` (`docs/api.md`의 코드 표현), 토큰 갱신용 동기 `AuthApi` | M3 ✅ |
+| `data/remote/auth` | `AuthInterceptor`(토큰 첨부 + 401 갱신), `AccessTokenRenewer`(리프레시 → 자동 재가입) | M3 ✅ |
+| `data/remote/ApiCall.kt` | Retrofit 예외 → `AppError` 정규화 | M3 ✅ |
 | `data/remote/dto` | `@Serializable` DTO (+ M3부터 `toDomain()` 매퍼) | M1 ✅ |
 | `data/remote/mock` | Mock 서버 (Phase A 전용) | M1 ✅ |
 | `data/di` | Hilt 모듈: `NetworkModule`, `TimeModule`, `MockApiModule`, `DatabaseModule`, `SensorModule`, `RepositoryModule` | M2 ✅ |
-| `data/local` | `WorkingAppDatabase`, `dao/StepDao`, `entity/*` (+ 매퍼) | M2 ✅ |
+| `data/local` | `WorkingAppDatabase`, `dao/StepDao`, `entity/*` (+ 매퍼), `SessionStore`(토큰·닉네임·동네) | M3 ✅ |
 | `data/sensor` | `StepDataSource` + `AndroidStepDataSource`(STEP_COUNTER) / `SimulatedStepDataSource`(에뮬레이터) | M2 ✅ |
-| `data/repository` | `StepRepositoryImpl` | M2 ✅ |
-| `domain/model`, `domain/repository`, `domain/step` | `StepReading`·`DailySteps`, `StepRepository`, `StepDeltaCalculator` | M2 ✅ |
+| `data/repository` | `StepRepositoryImpl`(측정·동기화), `AccountRepositoryImpl`(가입·동네) | M3 ✅ |
+| `domain/model`, `domain/repository`, `domain/step` | `StepReading`·`DailySteps`·`Region`·`AppError`, `StepRepository`·`AccountRepository`, `StepDeltaCalculator` | M3 ✅ |
+| `presentation/onboarding`, `presentation/region` | 닉네임 → 가입 → 동네 선택(결과는 `ResultEventBus`) | M3 ✅ |
+| `presentation/nav` | `AppNavViewModel`(온보딩 여부로 시작 화면 결정), `RegionResult` | M3 ✅ |
+| `presentation/text/AppErrorText.kt` | `AppError` → `UiText` 매핑 (한 곳에서만) | M3 ✅ |
 | `presentation/home` | 1차 홈 (오늘 걸음, 권한·센서 미지원 상태) — M4에서 확장 | M2 ✅ |
 | `presentation/nav` | `NavKeys.kt`, `AppNavHost.kt` (Navigation 3) | M1 ✅ |
 | `presentation/text` | `UiText` + `asString()` (i18n-safe 메시지) | M1 ✅ |
 | `presentation/placeholder` | 화면 골격용 임시 화면 — 실제 화면이 생기면 삭제 | M1 (임시) |
 | `service` | `StepCounterService`(FGS type=health), `BootCompletedReceiver`, `StepNotificationFactory` | M2 ✅ |
-| `worker` | `StepSnapshotWorker` (15분 주기) | M2 ✅ |
+| `worker` | `StepSnapshotWorker` (15분 주기), `StepSyncWorker` (15분 주기 + 앱 시작·온보딩 완료 시, 네트워크 조건, 지수 백오프) | M3 ✅ |
 
 ### 지침에 없는 패키지를 추가한 이유
 
@@ -96,7 +101,39 @@ BootCompletedReceiver → 재부팅·앱 업데이트 후 StepCounterService 재
 - `StepSnapshotWorker` 예정 실행: `Worker result SUCCESS` (HiltWorkerFactory 연결 확인)
 - 단위 테스트 `StepDeltaCalculatorTest` 8개, 계측 테스트 `StepRepositoryImplTest` 4개 (동시 기록 20회 → 1회만 반영 포함)
 
-## 4. Mock 서버 (Phase A)
+## 4. 인증 & 동기화 (M3)
+
+```
+PedometerApi ─ OkHttpClient: [AuthInterceptor] → (로깅) → MockApiInterceptor
+                                │ 401
+                                ▼
+                         AccessTokenRenewer (동기, lock)
+                           1) 다른 요청이 이미 갱신했으면 그 토큰
+                           2) AuthApi.refresh  ─ 거부(401) ─▶ 3) 저장된 닉네임·동네로 재가입 + 걸음 전부 미동기화
+                              └ 네트워크 실패 → 포기 (재가입하지 않음)
+AuthApi ─ @AuthClient OkHttpClient: (로깅) → MockApiInterceptor   ← AuthInterceptor 없음: 갱신이 갱신을 부르지 않게
+```
+
+### 설계 결정 (선택하지 않은 대안 포함)
+
+| 결정 | 선택 | 선택하지 않은 대안 → 이유 |
+|---|---|---|
+| 401 처리 위치 | **`AuthInterceptor`(애플리케이션 인터셉터)에서 갱신 후 한 번 재시도** | OkHttp `Authenticator`: 애플리케이션 인터셉터 뒤(`RetryAndFollowUpInterceptor`)에서 동작해 Mock이 바로 돌려준 401을 보지 못한다 (실측: 호출 0회, 계측 테스트 실패로 발견). 인터셉터 방식은 Mock·실제 서버 모두 같게 동작한다. |
+| 토큰 저장소 | **SharedPreferences** | DataStore(TODO 초안): 인터셉터는 동기 함수라 토큰을 동기로 읽어야 하는데 DataStore는 `runBlocking` 없이 불가(지침 금지). EncryptedSharedPreferences: 지원 중단 — 토큰 암호화는 이번 범위 밖. |
+| 갱신 전용 클라이언트 | **`@AuthClient` 별도 OkHttpClient + 동기 `AuthApi`** | 같은 클라이언트 사용: 갱신 요청이 다시 AuthInterceptor를 거치며 재귀가 생길 수 있다. |
+| 동시 401 | **`synchronized` + "실패한 토큰과 현재 토큰이 다르면 이미 갱신됨"** | 요청마다 갱신: 동시에 401을 받은 요청들이 각각 리프레시해 rotation으로 서로의 토큰을 무효화한다. |
+| 리프레시 실패 구분 | **401(거부)일 때만 재가입, 네트워크 실패는 포기** | 모든 실패에 재가입: 일시적 네트워크 문제로 멀쩡한 계정을 버린다. |
+| 재가입 후 걸음 | **로컬 걸음 전부 미동기화로 되돌림** (PRD Q19) | 그대로 둠: 새 계정의 서버 걸음이 0이 되어 리워드·랭킹이 틀어진다. |
+| 동기화 완료 표시 | **업로드 직전에 읽은 `updated_at`이 그대로일 때만 `synced=1`** | 무조건 표시: 업로드하는 동안 쌓인 걸음이 영영 올라가지 않는다. 같은 ms 안의 변경은 놓칠 수 있지만, 다음 걸음이 기록되면 다시 미동기화가 되어 자동 복구된다. |
+| 오류 전달 | **Repository에서 `AppError`(Network/Server/Unauthorized/InvalidRequest/Unknown)로 정규화, `toUiText()` 한 곳에서 문구 매핑** | ViewModel이 `HttpException` 직접 처리: 지침 위반, 화면마다 매핑 중복. |
+| 온보딩 상태 판단 | **`AppNavViewModel`이 SharedPreferences를 동기로 읽어 시작 화면 결정** | 스플래시 + 비동기 로딩: 동기 저장소라 필요 없다. |
+
+### 검증 (에뮬레이터, 시뮬레이션 센서)
+- 새 설치 → 닉네임 입력 → 가입 → 동네 목록(10개) → 성수동 선택(`ResultEventBus`) → 홈, 뒤로가기 시 온보딩으로 돌아가지 않음
+- 앱 강제 종료 후 재실행(Mock 상태 소실): `sync 401 → refresh 401 → 재가입 201 → 동네 복원 200 → sync 재시도 200`, 화면 흐름 끊김 없음
+- 계측 테스트: `AuthRenewalTest` 2개(토큰 만료 재발급, 재가입·동네 복원·미동기화), `StepRepositoryImplTest` +2개(업로드 후 synced, 업로드 중 변경 시 미표시)
+
+## 5. Mock 서버 (Phase A)
 
 ```
 PedometerApi(Retrofit) → OkHttpClient
@@ -124,10 +161,11 @@ PedometerApi(Retrofit) → OkHttpClient
 2. `AndroidManifest.xml`에 `INTERNET` 권한 추가 (Mock은 실제 네트워크를 쓰지 않아 지금은 없음)
 3. `docs/api.md` 기준으로 Mock과 서버 응답 차이 점검
 
-## 5. 빌드 메모
+## 6. 빌드 메모
 
 - AGP 9 내장 Kotlin + KSP 2.0.x 조합 때문에 `gradle.properties`에 `android.disallowKotlinSourceSets=false`가 필요하다 (실험적 옵션 경고가 뜨는 것은 정상). KSP가 `android.sourceSets` 방식을 지원하면 제거한다.
 - Hilt 2.60 생성 코드가 `@CanIgnoreReturnValue`를 참조해 `error_prone_annotations`를 `compileOnly`로 추가했다.
 - Navigation 3의 `ResultEventBus`는 1.2.0-alpha 라인에만 있어 alpha 버전을 쓴다.
 - Room 스키마는 `app/schemas/`에 내보낸다 (마이그레이션 테스트용, 커밋 대상).
+- KDoc·블록 주석 안에 `/*` 를 쓰지 않는다 (예: `/auth/*`). Kotlin 블록 주석은 중첩되어 주석이 닫히지 않고 뒤의 클래스 전체가 사라진다 — KSP가 "could not be resolved"로만 알려 준다.
 - `connectedDebugAndroidTest`는 연결된 **모든 기기**에서 실행된다. 에뮬레이터만 쓰려면 `ANDROID_SERIAL=emulator-5554`를 지정한다.

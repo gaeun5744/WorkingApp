@@ -20,9 +20,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.workingapp.R
 import com.example.workingapp.presentation.nav.HistoryKey
-import com.example.workingapp.presentation.nav.OnboardingKey
 import com.example.workingapp.presentation.nav.RankingKey
-import com.example.workingapp.presentation.nav.RegionSelectKey
 import com.example.workingapp.presentation.nav.WalletKey
 import com.example.workingapp.ui.theme.WorkingAppTheme
 
@@ -97,8 +95,6 @@ private fun TemporaryNavigation(onEvent: (HomeEvent) -> Unit) {
             R.string.screen_history to HistoryKey,
             R.string.screen_ranking to RankingKey,
             R.string.screen_wallet to WalletKey,
-            R.string.screen_region_select to RegionSelectKey,
-            R.string.screen_onboarding to OnboardingKey,
         ).forEach { (label, key) ->
             OutlinedButton(onClick = { onEvent(HomeEvent.Navigate(key)) }, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(label))
