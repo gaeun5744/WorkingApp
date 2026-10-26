@@ -17,6 +17,7 @@ import com.example.workingapp.presentation.home.HomeRoute
 import com.example.workingapp.presentation.onboarding.OnboardingRoute
 import com.example.workingapp.presentation.placeholder.PlaceholderScreen
 import com.example.workingapp.presentation.region.RegionSelectRoute
+import com.example.workingapp.presentation.wallet.WalletRoute
 
 @Composable
 fun AppNavHost(
@@ -57,7 +58,7 @@ fun AppNavHost(
             entry<HomeKey> { HomeRoute(onNavigate = navigate) }
             entry<HistoryKey> { HistoryRoute() }
             entry<RankingKey> { PlaceholderScreen(title = stringResource(R.string.screen_ranking)) }
-            entry<WalletKey> { PlaceholderScreen(title = stringResource(R.string.screen_wallet)) }
+            entry<WalletKey> { WalletRoute() }
         },
     )
 }

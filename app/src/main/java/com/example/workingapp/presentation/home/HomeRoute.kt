@@ -9,7 +9,9 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
@@ -17,6 +19,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation3.runtime.NavKey
+import com.example.workingapp.presentation.text.resolve
 import com.example.workingapp.service.StepCounterService
 
 @Composable
@@ -37,7 +40,17 @@ fun HomeRoute(
         val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.ACTIVITY_RECOGNITION) ==
             PackageManager.PERMISSION_GRANTED
         viewModel.onPermissionChecked(granted)
+        viewModel.onResume()
         onPauseOrDispose { }
+    }
+
+    val snackbarHostState = remember { SnackbarHostState() }
+    LaunchedEffect(viewModel) {
+        viewModel.effects.collect { effect ->
+            when (effect) {
+                is HomeEffect.ShowMessage -> snackbarHostState.showSnackbar(effect.message.resolve(context))
+            }
+        }
     }
 
     val isTracking = uiState is HomeUiState.Tracking
@@ -56,9 +69,12 @@ fun HomeRoute(
                     Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null)),
                 )
                 is HomeEvent.ChangeGoal -> viewModel.onGoalChange(event.goal)
+                is HomeEvent.ClaimReward -> viewModel.onClaim(event.tier)
+                HomeEvent.RetryRewards -> viewModel.onRetryRewards()
                 is HomeEvent.Navigate -> onNavigate(event.key)
             }
         },
         modifier = modifier,
+        snackbarHostState = snackbarHostState,
     )
 }

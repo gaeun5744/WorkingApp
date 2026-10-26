@@ -29,13 +29,15 @@
 | `data/di` | Hilt 모듈: `NetworkModule`, `TimeModule`, `MockApiModule`, `DatabaseModule`, `SensorModule`, `RepositoryModule` | M2 ✅ |
 | `data/local` | `WorkingAppDatabase`(v2), `dao/StepDao`, `entity/*` (+ 매퍼), `SessionStore`(토큰·닉네임·동네), `GoalStore`(목표, DataStore) | M4 ✅ |
 | `data/sensor` | `StepDataSource` + `AndroidStepDataSource`(STEP_COUNTER) / `SimulatedStepDataSource`(에뮬레이터) | M2 ✅ |
-| `data/repository` | `StepRepositoryImpl`(측정·동기화), `AccountRepositoryImpl`(가입·동네) | M3 ✅ |
+| `data/repository` | `StepRepositoryImpl`(측정·동기화), `AccountRepositoryImpl`(가입·동네), `GoalRepositoryImpl`, `RewardRepositoryImpl`(리워드·지갑) | M5 ✅ |
 | `domain/model`, `domain/repository`, `domain/step` | `StepReading`·`DailySteps`·`HourlySteps`·`Region`·`AppError`, `StepRepository`·`AccountRepository`·`GoalRepository`, `StepDeltaCalculator`·`StepMetrics` | M4 ✅ |
 | `domain/history` | `HistoryPeriod`·`HistoryRange`·`HistorySummary` (기간 계산·통계, 순수 Kotlin) | M4 ✅ |
 | `presentation/onboarding`, `presentation/region` | 닉네임 → 가입 → 동네 선택(결과는 `ResultEventBus`) | M3 ✅ |
 | `presentation/nav` | `AppNavViewModel`(온보딩 여부로 시작 화면 결정), `RegionResult` | M3 ✅ |
 | `presentation/text/AppErrorText.kt` | `AppError` → `UiText` 매핑 (한 곳에서만) | M3 ✅ |
 | `presentation/home` | 홈: 목표 진행 링(`StepProgressRing`), 환산값, 목표 변경(`GoalDialog`), 권한·센서 미지원 상태 | M4 ✅ |
+| `presentation/home/components/RewardTiersCard` | 리워드 구간 버튼 (잠김/받기/받음) | M5 ✅ |
+| `presentation/wallet` | 지갑: 잔액 + 적립 내역 | M5 ✅ |
 | `presentation/history` | 기록: 일/주/월 탭, 기간 이동, 합계·평균·달성 일수, Canvas 막대 그래프(`StepBarChart`) | M4 ✅ |
 | `presentation/nav` | `NavKeys.kt`, `AppNavHost.kt` (Navigation 3) | M1 ✅ |
 | `presentation/text` | `UiText` + `asString()` (i18n-safe 메시지) | M1 ✅ |
@@ -157,7 +159,37 @@ AuthApi ─ @AuthClient OkHttpClient: (로깅) → MockApiInterceptor   ← Auth
 - 에뮬레이터: 목표 3,000보로 변경 → 홈 즉시 반영, 기록 주/일/월 전환·이전/다음 이동, 오늘 포함 기간에서 다음 비활성
 - 확인 못 한 것: 실제 기기에서 v1 DB가 있는 상태로의 업그레이드 (계측 테스트 실행이 에뮬레이터 앱을 지워 새 설치가 됨). 마이그레이션 자체는 `MigrationTest`가 v1 스키마로 검증.
 
-## 6. Mock 서버 (Phase A)
+## 6. 리워드 & 지갑 (M5)
+
+```
+[받기] 탭 → HomeViewModel.onClaim(tier)
+  ① 응답 대기 중이거나 이미 받은 구간이면 무시 (연타 방지)
+  ② 낙관적 반영: inFlight 에 넣어 바로 "받음" 표시
+  ③ StepRepository.syncPendingSteps()  ── 실패 → 되돌림 + 안내 (수령 요청 안 함)
+  ④ RewardRepository.claim(오늘, tier)  ── 실패 → 되돌림 + 코드별 안내 (NOT_REACHED / NOT_TODAY / 네트워크)
+  ⑤ 성공 → claimed 에 확정, "+NP 적립! 잔액 MP" (alreadyClaimed 면 "이미 받은 리워드") → 서버 상태 새로고침
+안내 메시지는 HomeEffect(Channel) → Route 가 Snackbar 로 표시 (UiState 에 섞지 않음)
+```
+
+### 설계 결정 (선택하지 않은 대안 포함)
+
+| 결정 | 선택 | 선택하지 않은 대안 → 이유 |
+|---|---|---|
+| 버튼 상태의 기준 | **"받음"은 서버, "받기 가능"은 기기 걸음** | 서버 상태만: 서버 걸음은 동기화 주기(최대 15분)만큼 늦어 이미 걸은 구간이 한동안 잠겨 보인다. 기기 걸음만: 다른 기기·재설치 후 이미 받은 구간을 다시 받을 수 있는 것처럼 보인다. 지급 판정은 항상 서버 (PRD Q5). |
+| 수령 직전 동기화 | **수령 요청 전에 미동기화 걸음을 먼저 업로드** | 그냥 요청: 기기에서는 받기 가능인데 서버가 `REWARD_NOT_REACHED`로 거절하는 일이 잦아진다. |
+| 반영 방식 | **낙관적 UI** (먼저 "받음", 실패 시 되돌림) | 응답 후 반영: 동기화 + 수령 왕복(실측 약 1.5초) 동안 버튼이 그대로라 다시 누르게 된다. |
+| 중복 수령 방지 | **클라이언트 연타 방지(inFlight) + 서버 멱등(`(user, date, tier)` 유니크, `alreadyClaimed`)** | 클라이언트만: 앱 재시작·네트워크 재시도에서 중복될 수 있다. 서버만: 동작은 맞지만 불필요한 요청이 나간다. |
+| 일회성 안내 | **`HomeEffect` Channel → Snackbar** | UiState 에 메시지 필드: 화면 회전·재구독 때 같은 메시지가 다시 뜬다 (지침). |
+| 리워드 새로고침 시점 | **날짜 변경, 화면 복귀(onResume), 수령 성공 후** | 주기적 폴링: Mock·서버에 불필요한 부하. |
+| 새로고침 실패 | **이미 받은 데이터가 있으면 유지**, 처음 실패만 오류 + 재시도 | 실패마다 오류 표시: 일시적 실패로 버튼이 사라졌다 나타난다. |
+| 지갑 구간 표시 | **적립 사유 `REWARD_TIER_N` → 구간 번호로 매핑, 걸음 수 문구는 Screen** | 서버 사유 문자열 그대로 노출: 사용자용 문구가 아니다. |
+
+### 검증
+- 단위 테스트: `HomeRewardClaimTest` 8 (기기 걸음 기준 받기 가능, 낙관적 반영·동기화 순서, 적립 안내, 미달 거절 되돌림, 동기화 실패 시 미요청, 연타 1회, 이미 받음 안내, 서버 받음 비활성), `WalletViewModelTest` 2, `RewardRepositoryImplTest` 2 (Mock 경로 매핑·에러 코드)
+- 에뮬레이터: 1구간 수령 — 탭 0.3초 뒤 "받음"(응답 전 낙관적 반영), 요청 순서 `steps/sync → rewards/claim → rewards/today`, 받은 뒤 연타 시 추가 요청 0건, Snackbar "1P 적립! 잔액 1P", 지갑 잔액 1P·내역 "1,000보 리워드"
+- 에뮬레이터: 동시 401(`/rewards/today` + `/steps/sync`)에도 리프레시·재가입은 1회 (M3 잠금 확인)
+
+## 7. Mock 서버 (Phase A)
 
 ```
 PedometerApi(Retrofit) → OkHttpClient
@@ -185,12 +217,13 @@ PedometerApi(Retrofit) → OkHttpClient
 2. `AndroidManifest.xml`에 `INTERNET` 권한 추가 (Mock은 실제 네트워크를 쓰지 않아 지금은 없음)
 3. `docs/api.md` 기준으로 Mock과 서버 응답 차이 점검
 
-## 7. 빌드 메모
+## 8. 빌드 메모
 
 - AGP 9 내장 Kotlin + KSP 2.0.x 조합 때문에 `gradle.properties`에 `android.disallowKotlinSourceSets=false`가 필요하다 (실험적 옵션 경고가 뜨는 것은 정상). KSP가 `android.sourceSets` 방식을 지원하면 제거한다.
 - Hilt 2.60 생성 코드가 `@CanIgnoreReturnValue`를 참조해 `error_prone_annotations`를 `compileOnly`로 추가했다.
 - Navigation 3의 `ResultEventBus`는 1.2.0-alpha 라인에만 있어 alpha 버전을 쓴다.
 - Room 스키마는 `app/schemas/`에 내보낸다 (마이그레이션 테스트용, 커밋 대상).
 - KDoc·블록 주석 안에 `/*` 를 쓰지 않는다 (예: `/auth/*`). Kotlin 블록 주석은 중첩되어 주석이 닫히지 않고 뒤의 클래스 전체가 사라진다 — KSP가 "could not be resolved"로만 알려 준다.
+- 16KB 페이지 호환성: `datastore-preferences` 1.2.0 의 `libdatastore_shared_counter.so`(RELRO 미정렬)와 `libandroidx.graphics.path.so`가 16KB 정렬이 아니어서 API 37 에뮬레이터에서 호환 모드 경고가 뜬다. 앱은 동작하지만 후속 처리 필요 (TODO 공통 항목).
 - `connectedDebugAndroidTest`는 테스트가 끝나면 대상 기기의 앱을 **삭제**한다. 기기 데이터로 업그레이드를 확인하려면 계측 테스트 전에 한다.
 - `connectedDebugAndroidTest`는 연결된 **모든 기기**에서 실행된다. 에뮬레이터만 쓰려면 `ANDROID_SERIAL=emulator-5554`를 지정한다.

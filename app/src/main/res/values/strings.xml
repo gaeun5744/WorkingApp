@@ -37,6 +37,25 @@
     <string name="region_search_placeholder">동네 이름으로 검색</string>
     <string name="region_empty">검색 결과가 없어요</string>
 
+    <string name="reward_title">오늘의 걸음 리워드</string>
+    <string name="reward_tier_steps">%,d보</string>
+    <string name="reward_tier_points">%dP</string>
+    <string name="reward_tier_claimed">받음</string>
+    <string name="reward_load_failed">리워드를 불러오지 못했어요</string>
+    <string name="reward_claimed">%1$dP 적립! 잔액 %2$dP</string>
+    <string name="reward_already_claimed">이미 받은 리워드예요</string>
+    <string name="reward_error_not_reached">서버에 아직 걸음이 반영되지 않았어요. 잠시 후 다시 시도해 주세요</string>
+    <string name="reward_error_not_today">날짜가 바뀌었어요. 오늘 리워드를 확인해 주세요</string>
+
+    <string name="wallet_balance">%,dP</string>
+    <string name="wallet_balance_label">내 포인트</string>
+    <string name="wallet_history">적립 내역</string>
+    <string name="wallet_empty">아직 적립 내역이 없어요</string>
+    <string name="wallet_reason_reward_tier">%,d보 리워드</string>
+    <string name="wallet_reason_other">적립</string>
+    <string name="wallet_amount">+%dP</string>
+    <string name="wallet_date_time">%1$d월 %2$d일 %3$02d:%4$02d</string>
+
     <string-array name="history_periods">
         <item>일</item>
         <item>주</item>

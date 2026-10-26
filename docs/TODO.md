@@ -165,13 +165,17 @@ worker               WorkManager Worker                     ← 지침 확장
 
 ---
 
-## M5. 리워드 & 지갑 (Mock) (`feature/reward`) ★
+## M5. 리워드 & 지갑 (Mock) (`feature/m5-reward-wallet`) ✅
 
-- [ ] 홈에 리워드 구간 버튼 (잠김 / 수령 가능 / 수령 완료, M4에서 이동)
-- [ ] 수령 전 최신 걸음 동기화 → 수령 API (Play Integrity 토큰은 Phase B에서 추가)
-- [ ] 낙관적 UI 업데이트 → 실패 시 롤백
-- [ ] 버튼 연타·재시도에도 중복 수령 UI가 생기지 않음 (Mock 멱등 응답으로 검증)
-- [ ] 지갑 화면: 잔액 + 적립 내역
+설계 결정과 대안은 `docs/architecture.md` §6.
+
+- [x] 홈에 리워드 구간 버튼 (잠김 / 받기 / 받음, M4에서 이동) — "받음"은 서버, "받기 가능"은 기기 걸음 기준
+- [x] 수령 전 최신 걸음 동기화 → 수령 API (Play Integrity 토큰은 Phase B에서 추가)
+- [x] 낙관적 UI 업데이트 → 실패 시 롤백 + 코드별 안내(Snackbar, `HomeEffect`)
+- [x] 버튼 연타·재시도에도 중복 수령 없음 (클라이언트 inFlight + Mock 멱등 응답)
+- [x] 지갑 화면: 잔액 + 적립 내역, 오류 시 재시도
+- [x] 테스트: 수령 흐름 8, 지갑 2, Repository(Mock 경로) 2
+- [x] 에뮬레이터: 1구간 수령 — 탭 즉시 "받음"(낙관적), sync → claim → today 순 요청, 연타 추가 요청 0건, "1P 적립! 잔액 1P" 안내, 지갑 1P·내역 표시
 
 ---
 
@@ -254,6 +258,7 @@ worker               WorkManager Worker                     ← 지침 확장
 - 서버 (Phase B)
   - `server/`에서 `./gradlew test` (Testcontainers로 PostgreSQL·Redis 통합 테스트)
 - 배터리 사용량 측정 (Android Studio Energy Profiler)
+- 16KB 페이지 호환성: `datastore-preferences` 네이티브 라이브러리 정렬 문제 확인·대응 (새 버전 확인 또는 대체), Compose graphics 라이브러리 포함 (`docs/architecture.md` 빌드 메모)
 
 ---
 
