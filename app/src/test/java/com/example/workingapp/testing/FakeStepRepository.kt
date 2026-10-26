@@ -21,7 +21,14 @@ class FakeStepRepository(
     override fun readings(): Flow<StepReading> = emptyFlow()
     override suspend fun record(reading: StepReading) = Unit
     override fun observeTodaySteps(): Flow<DailySteps> = today
-    override suspend fun syncPendingSteps(): Result<Unit> = Result.success(Unit)
+    var syncResult: Result<Unit> = Result.success(Unit)
+    var syncCount = 0
+        private set
+
+    override suspend fun syncPendingSteps(): Result<Unit> {
+        syncCount++
+        return syncResult
+    }
 
     override fun observeDailySteps(from: LocalDate, to: LocalDate): Flow<List<DailySteps>> =
         days.map { list -> list.filter { !it.date.isBefore(from) && !it.date.isAfter(to) } }

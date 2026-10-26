@@ -1,6 +1,7 @@
 package com.example.workingapp.presentation.home
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -10,11 +11,14 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -26,22 +30,33 @@ import androidx.compose.ui.unit.dp
 import com.example.workingapp.R
 import com.example.workingapp.domain.step.StepMetrics
 import com.example.workingapp.presentation.home.components.GoalDialog
+import com.example.workingapp.presentation.home.components.RewardTiersCard
 import com.example.workingapp.presentation.home.components.StepProgressRing
 import com.example.workingapp.presentation.nav.HistoryKey
 import com.example.workingapp.presentation.nav.RankingKey
 import com.example.workingapp.presentation.nav.WalletKey
 import com.example.workingapp.ui.theme.WorkingAppTheme
+import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
 
-/** 홈: 오늘 걸음·목표 진행률·환산값. 리워드 구간 버튼은 M5 에서 추가한다. */
+/** 홈: 오늘 걸음·목표 진행률·환산값·리워드 구간 */
 @Composable
 fun HomeScreen(
     state: HomeUiState,
     onEvent: (HomeEvent) -> Unit,
     modifier: Modifier = Modifier,
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
+    Box(modifier = modifier.fillMaxSize()) {
+        HomeContent(state = state, onEvent = onEvent)
+        SnackbarHost(hostState = snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 80.dp))
+    }
+}
+
+@Composable
+private fun HomeContent(state: HomeUiState, onEvent: (HomeEvent) -> Unit) {
     Column(
-        modifier = modifier
+        modifier = Modifier
             .fillMaxSize()
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -85,6 +100,11 @@ private fun Tracking(state: HomeUiState.Tracking, onEvent: (HomeEvent) -> Unit) 
         }
     }
     MetricsRow(metrics = state.metrics)
+    RewardTiersCard(
+        section = state.rewards,
+        onClaim = { tier -> onEvent(HomeEvent.ClaimReward(tier)) },
+        onRetry = { onEvent(HomeEvent.RetryRewards) },
+    )
 
     if (showGoalDialog) {
         GoalDialog(
@@ -156,7 +176,20 @@ private fun TemporaryNavigation(onEvent: (HomeEvent) -> Unit) {
 private fun HomeScreenTrackingPreview() {
     WorkingAppTheme {
         HomeScreen(
-            state = HomeUiState.Tracking(todaySteps = 5_230, goal = 10_000, metrics = StepMetrics.from(5_230)),
+            state = HomeUiState.Tracking(
+                todaySteps = 5_230,
+                goal = 10_000,
+                metrics = StepMetrics.from(5_230),
+                rewards = RewardsSection.Loaded(
+                    persistentListOf(
+                        RewardTierUi(1, 1_000, 1, RewardTierState.CLAIMED),
+                        RewardTierUi(2, 3_000, 3, RewardTierState.CLAIMABLE),
+                        RewardTierUi(3, 5_000, 5, RewardTierState.CLAIMABLE),
+                        RewardTierUi(4, 7_000, 7, RewardTierState.LOCKED),
+                        RewardTierUi(5, 10_000, 10, RewardTierState.LOCKED),
+                    ),
+                ),
+            ),
             onEvent = {},
         )
     }
@@ -167,7 +200,12 @@ private fun HomeScreenTrackingPreview() {
 private fun HomeScreenGoalExceededPreview() {
     WorkingAppTheme {
         HomeScreen(
-            state = HomeUiState.Tracking(todaySteps = 12_480, goal = 10_000, metrics = StepMetrics.from(12_480)),
+            state = HomeUiState.Tracking(
+                todaySteps = 12_480,
+                goal = 10_000,
+                metrics = StepMetrics.from(12_480),
+                rewards = RewardsSection.Loading,
+            ),
             onEvent = {},
         )
     }

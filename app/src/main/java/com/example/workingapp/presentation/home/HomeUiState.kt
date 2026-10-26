@@ -10,6 +10,7 @@ sealed interface HomeUiState {
         val todaySteps: Int,
         val goal: Int,
         val metrics: StepMetrics,
+        val rewards: RewardsSection,
     ) : HomeUiState {
         /** 0.0~1.0 (목표를 넘어도 1.0) */
         val progress: Float get() = if (goal <= 0) 0f else (todaySteps.toFloat() / goal).coerceAtMost(1f)
