@@ -47,6 +47,16 @@
     <string name="reward_error_not_reached">서버에 아직 걸음이 반영되지 않았어요. 잠시 후 다시 시도해 주세요</string>
     <string name="reward_error_not_today">날짜가 바뀌었어요. 오늘 리워드를 확인해 주세요</string>
 
+    <string name="ranking_title">%1$s 랭킹</string>
+    <string name="ranking_change_region">동네 변경</string>
+    <string name="ranking_daily">오늘</string>
+    <string name="ranking_weekly">이번 주</string>
+    <string name="ranking_my_rank">내 순위 %d위</string>
+    <string name="ranking_steps">%,d보</string>
+    <string name="ranking_me_suffix">%1$s (나)</string>
+    <string name="ranking_fetched_at">%1$02d:%2$02d 기준</string>
+    <string name="ranking_region_not_set">랭킹을 보려면 동네를 정해 주세요</string>
+
     <string name="screen_walk_map">동네걷기</string>
     <string name="treasure_opened">보물상자에서 %1$dP 적립! 잔액 %2$dP</string>
     <string name="treasure_already_opened">이미 연 보물상자예요</string>

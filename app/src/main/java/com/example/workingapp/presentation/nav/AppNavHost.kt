@@ -2,7 +2,6 @@ package com.example.workingapp.presentation.nav
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 import androidx.navigation3.runtime.NavKey
@@ -11,14 +10,14 @@ import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.result.LocalResultEventBus
 import androidx.navigation3.runtime.result.rememberResultEventBusNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
-import com.example.workingapp.R
 import com.example.workingapp.presentation.history.HistoryRoute
 import com.example.workingapp.presentation.home.HomeRoute
 import com.example.workingapp.presentation.onboarding.OnboardingRoute
-import com.example.workingapp.presentation.placeholder.PlaceholderScreen
+import com.example.workingapp.presentation.ranking.RankingRoute
 import com.example.workingapp.presentation.region.RegionSelectRoute
 import com.example.workingapp.presentation.walkmap.WalkMapRoute
 import com.example.workingapp.presentation.wallet.WalletRoute
+import timber.log.Timber
 
 @Composable
 fun AppNavHost(
@@ -28,10 +27,21 @@ fun AppNavHost(
     val backStack = rememberNavBackStack(viewModel.startKey)
     val navigate: (NavKey) -> Unit = { key -> backStack.add(key) }
 
+    // 불변식: 백스택은 비면 안 된다 (NavDisplay 가 IllegalArgumentException 으로 종료).
+    // M7 에뮬레이터 확인 중 동네 선택 결과를 돌려준 직후 한 번 "backstack cannot be empty" 크래시가 났지만
+    // 재현하지 못해 원인을 찾지 못했다 (docs/architecture.md §8). 마지막 화면은 빼지 않고, 그런 시도가 있으면 기록한다.
+    val pop: (from: String) -> Unit = { from ->
+        if (backStack.size > 1) {
+            backStack.removeLastOrNull()
+        } else {
+            Timber.w("마지막 화면을 빼려는 시도를 막음 (from=%s, backStack=%s)", from, backStack.toList())
+        }
+    }
+
     NavDisplay(
         backStack = backStack,
         modifier = modifier,
-        onBack = { backStack.removeLastOrNull() },
+        onBack = { pop("onBack") },
         entryDecorators = listOf(
             rememberResultEventBusNavEntryDecorator(),
             rememberViewModelStoreNavEntryDecorator(),
@@ -52,13 +62,13 @@ fun AppNavHost(
                 RegionSelectRoute(
                     onRegionSelected = { region ->
                         resultBus.sendResult(RegionResult(region.id, region.name))
-                        backStack.removeLastOrNull()
+                        pop("regionSelected")
                     },
                 )
             }
             entry<HomeKey> { HomeRoute(onNavigate = navigate) }
             entry<HistoryKey> { HistoryRoute() }
-            entry<RankingKey> { PlaceholderScreen(title = stringResource(R.string.screen_ranking)) }
+            entry<RankingKey> { RankingRoute(onChangeRegion = { navigate(RegionSelectKey) }) }
             entry<WalletKey> { WalletRoute() }
             entry<WalkMapKey> { WalkMapRoute() }
         },
