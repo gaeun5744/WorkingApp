@@ -2,6 +2,7 @@ package com.example.workingapp.presentation.home
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -12,6 +13,10 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -19,12 +24,16 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.workingapp.R
+import com.example.workingapp.domain.step.StepMetrics
+import com.example.workingapp.presentation.home.components.GoalDialog
+import com.example.workingapp.presentation.home.components.StepProgressRing
 import com.example.workingapp.presentation.nav.HistoryKey
 import com.example.workingapp.presentation.nav.RankingKey
 import com.example.workingapp.presentation.nav.WalletKey
 import com.example.workingapp.ui.theme.WorkingAppTheme
+import kotlinx.collections.immutable.toImmutableList
 
-/** M2 1차 홈: 오늘 걸음과 측정 상태. 진행 바·리워드 구간은 M4 에서 추가한다. */
+/** 홈: 오늘 걸음·목표 진행률·환산값. 리워드 구간 버튼은 M5 에서 추가한다. */
 @Composable
 fun HomeScreen(
     state: HomeUiState,
@@ -41,12 +50,12 @@ fun HomeScreen(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
+            verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             when (state) {
                 HomeUiState.Loading -> CircularProgressIndicator()
-                is HomeUiState.Tracking -> TodaySteps(steps = state.todaySteps)
+                is HomeUiState.Tracking -> Tracking(state = state, onEvent = onEvent)
                 HomeUiState.PermissionRequired -> PermissionRequired(onEvent = onEvent)
                 HomeUiState.SensorUnavailable -> Message(
                     title = stringResource(R.string.home_sensor_unavailable_title),
@@ -54,18 +63,57 @@ fun HomeScreen(
                 )
             }
         }
-        // 다른 화면이 만들어지기 전까지의 임시 이동 버튼
+        // 하단 내비게이션이 생기기 전까지의 임시 이동 버튼
         TemporaryNavigation(onEvent = onEvent)
     }
 }
 
 @Composable
-private fun TodaySteps(steps: Int) {
-    Text(
-        text = stringResource(R.string.home_today_steps, steps),
-        style = MaterialTheme.typography.displayLarge,
-    )
-    Text(text = stringResource(R.string.home_steps_unit), style = MaterialTheme.typography.titleMedium)
+private fun Tracking(state: HomeUiState.Tracking, onEvent: (HomeEvent) -> Unit) {
+    // 다이얼로그 표시 여부는 이 화면 안에서만 쓰는 UI 상태라 ViewModel 에 두지 않는다
+    var showGoalDialog by rememberSaveable { mutableStateOf(false) }
+
+    StepProgressRing(progress = state.progress) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = stringResource(R.string.home_today_steps, state.todaySteps),
+                style = MaterialTheme.typography.displayMedium,
+            )
+            TextButton(onClick = { showGoalDialog = true }) {
+                Text(stringResource(R.string.home_goal, state.goal))
+            }
+        }
+    }
+    MetricsRow(metrics = state.metrics)
+
+    if (showGoalDialog) {
+        GoalDialog(
+            options = HomeViewModel.GOAL_OPTIONS.toImmutableList(),
+            currentGoal = state.goal,
+            onSelect = { goal ->
+                onEvent(HomeEvent.ChangeGoal(goal))
+                showGoalDialog = false
+            },
+            onDismiss = { showGoalDialog = false },
+        )
+    }
+}
+
+@Composable
+private fun MetricsRow(metrics: StepMetrics) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+        Metric(value = stringResource(R.string.home_metric_distance, metrics.distanceKm), label = stringResource(R.string.home_metric_distance_label))
+        Metric(value = stringResource(R.string.home_metric_kcal, metrics.kcal), label = stringResource(R.string.home_metric_kcal_label))
+        Metric(value = stringResource(R.string.home_metric_minutes, metrics.minutes), label = stringResource(R.string.home_metric_minutes_label))
+    }
+}
+
+@Composable
+private fun Metric(value: String, label: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(text = value, style = MaterialTheme.typography.titleMedium)
+        Text(text = label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
 }
 
 @Composable
@@ -90,13 +138,13 @@ private fun Message(title: String, description: String) {
 
 @Composable
 private fun TemporaryNavigation(onEvent: (HomeEvent) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         listOf(
             R.string.screen_history to HistoryKey,
             R.string.screen_ranking to RankingKey,
             R.string.screen_wallet to WalletKey,
         ).forEach { (label, key) ->
-            OutlinedButton(onClick = { onEvent(HomeEvent.Navigate(key)) }, modifier = Modifier.fillMaxWidth()) {
+            OutlinedButton(onClick = { onEvent(HomeEvent.Navigate(key)) }, modifier = Modifier.weight(1f)) {
                 Text(stringResource(label))
             }
         }
@@ -106,7 +154,23 @@ private fun TemporaryNavigation(onEvent: (HomeEvent) -> Unit) {
 @Preview(showBackground = true)
 @Composable
 private fun HomeScreenTrackingPreview() {
-    WorkingAppTheme { HomeScreen(state = HomeUiState.Tracking(todaySteps = 5_230), onEvent = {}) }
+    WorkingAppTheme {
+        HomeScreen(
+            state = HomeUiState.Tracking(todaySteps = 5_230, goal = 10_000, metrics = StepMetrics.from(5_230)),
+            onEvent = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun HomeScreenGoalExceededPreview() {
+    WorkingAppTheme {
+        HomeScreen(
+            state = HomeUiState.Tracking(todaySteps = 12_480, goal = 10_000, metrics = StepMetrics.from(12_480)),
+            onEvent = {},
+        )
+    }
 }
 
 @Preview(showBackground = true)
@@ -119,10 +183,4 @@ private fun HomeScreenPermissionPreview() {
 @Composable
 private fun HomeScreenSensorUnavailablePreview() {
     WorkingAppTheme { HomeScreen(state = HomeUiState.SensorUnavailable, onEvent = {}) }
-}
-
-@Preview(showBackground = true)
-@Composable
-private fun HomeScreenLoadingPreview() {
-    WorkingAppTheme { HomeScreen(state = HomeUiState.Loading, onEvent = {}) }
 }

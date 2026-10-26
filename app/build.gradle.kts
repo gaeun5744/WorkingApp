@@ -88,6 +88,7 @@ dependencies {
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
     ksp(libs.room.compiler)
+    implementation(libs.androidx.datastore.preferences)
 
     // Background: Foreground Service(LifecycleService), WorkManager + Hilt Worker
     implementation(libs.androidx.lifecycle.service)
@@ -100,11 +101,13 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.turbine)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.kotlinx.coroutines.test)
+    androidTestImplementation(libs.room.testing)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
 }

@@ -64,7 +64,7 @@ class AuthRenewalTest {
         val before = MockBackend(clock, sessionStore, database.stepDao())
         onboard(before)
         val oldUserId = before.api.getMe().userId
-        database.stepDao().upsertDaily(DailyStepsEntity("2026-10-25", 3_000, updatedAtMillis = 1, synced = true))
+        database.stepDao().upsertDaily(DailyStepsEntity("2026-10-25", 3_000, updatedAtMillis = 1, synced = true, goal = 10_000))
 
         // Mock 프로세스 재시작: 서버 상태가 비어 저장된 토큰이 모두 무효가 된다
         val after = MockBackend(clock, sessionStore, database.stepDao())

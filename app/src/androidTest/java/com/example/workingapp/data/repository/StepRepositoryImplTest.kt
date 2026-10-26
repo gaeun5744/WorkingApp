@@ -4,12 +4,14 @@ import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.example.workingapp.data.local.GoalStore
 import com.example.workingapp.data.local.SessionStore
 import com.example.workingapp.data.local.WorkingAppDatabase
 import com.example.workingapp.data.local.entity.DailyStepsEntity
 import com.example.workingapp.data.sensor.StepDataSource
 import com.example.workingapp.domain.model.StepReading
 import com.example.workingapp.testing.MockBackend
+import com.example.workingapp.testing.testGoalStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -37,6 +39,7 @@ class StepRepositoryImplTest {
     private lateinit var repository: StepRepositoryImpl
     private lateinit var backend: MockBackend
     private lateinit var account: AccountRepositoryImpl
+    private lateinit var goalStore: GoalStore
 
     private val context = ApplicationProvider.getApplicationContext<Context>()
 
@@ -52,7 +55,8 @@ class StepRepositoryImplTest {
         val sessionStore = SessionStore(context)
         backend = MockBackend(clock, sessionStore, database.stepDao())
         account = AccountRepositoryImpl(backend.api, sessionStore, backend.json)
-        repository = StepRepositoryImpl(database, noSensor, clock, backend.api, backend.json)
+        goalStore = testGoalStore(context)
+        repository = StepRepositoryImpl(database, noSensor, clock, backend.api, backend.json, goalStore)
     }
 
     @After
@@ -105,13 +109,27 @@ class StepRepositoryImplTest {
 
     @Test
     fun 업로드하는_동안_걸음이_바뀌었으면_동기화_완료로_표시하지_않는다() = runTest {
-        database.stepDao().upsertDaily(DailyStepsEntity("2026-10-25", 500, updatedAtMillis = 2, synced = false))
+        database.stepDao().upsertDaily(DailyStepsEntity("2026-10-25", 500, updatedAtMillis = 2, synced = false, goal = 10_000))
 
         // 업로드 직전에 읽은 값(updatedAt=1)과 지금 값(2)이 다르다
         val updated = database.stepDao().markSynced("2026-10-25", updatedAtMillis = 1)
 
         assertEquals(0, updated)
         assertEquals(false, database.stepDao().getDaily("2026-10-25")?.synced)
+    }
+
+    @Test
+    fun 그날_첫_기록에_현재_목표를_남기고_목표를_바꾸면_오늘만_바뀐다() = runTest {
+        database.stepDao().upsertDaily(DailyStepsEntity("2026-10-24", 9_000, updatedAtMillis = 1, synced = true, goal = 8_000))
+        goalStore.set(9_000)
+        repository.record(reading(1_000))
+        repository.record(reading(1_100))
+
+        GoalRepositoryImpl(goalStore, database.stepDao(), clock).setGoal(12_000)
+
+        assertEquals(12_000, database.stepDao().getDaily("2026-10-25")?.goal)
+        assertEquals(8_000, database.stepDao().getDaily("2026-10-24")?.goal)
+        assertEquals(12_000, repository.observeTodaySteps().first().goal)
     }
 
     @Test

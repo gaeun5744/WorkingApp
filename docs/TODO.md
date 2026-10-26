@@ -13,7 +13,7 @@
 
 | 영역 | 스택 |
 |---|---|
-| 앱 | 단일 모듈 `:app`, Kotlin, Compose(Material3), Hilt, Retrofit + OkHttp + kotlinx.serialization, Navigation 3 + `ResultEventBus`, Timber, Room, SharedPreferences(세션), WorkManager, Foreground Service |
+| 앱 | 단일 모듈 `:app`, Kotlin, Compose(Material3), Hilt, Retrofit + OkHttp + kotlinx.serialization, Navigation 3 + `ResultEventBus`, Timber, Room, SharedPreferences(세션), DataStore(설정), WorkManager, Foreground Service |
 | Mock 서버 (Phase A) | 앱 내부 OkHttp `MockApiInterceptor` (PRD Q18) |
 | 서버 (Phase B) | Spring Boot (Kotlin), Spring Data JPA + 네이티브 upsert, Flyway, PostgreSQL, Redis, JWT |
 | 인프라 (Phase B) | Docker Compose(로컬·운영 동일), VM 1대, Caddy(HTTPS), GitHub Actions |
@@ -38,7 +38,7 @@
   - Navigation 3, Retrofit, OkHttp, kotlinx.serialization
   - Timber, `kotlinx-collections-immutable`, `lifecycle-runtime-compose`
   - 테스트: `kotlinx-coroutines-test`
-  - Room·WorkManager는 M2, Turbine은 M4에서 실제로 쓸 때 추가 (최소 수정 원칙). DataStore·MockWebServer는 쓰지 않음 (M2·M3 변경 참고)
+  - Room·WorkManager는 M2, DataStore·Turbine·room-testing은 M4에서 실제로 쓸 때 추가 (최소 수정 원칙). MockWebServer는 쓰지 않음 (M3 변경 참고)
 - [x] `@HiltAndroidApp` Application(Timber 초기화 포함), `MainActivity`에 `@AndroidEntryPoint`
 - [x] `presentation/nav/AppNavHost.kt`에 `NavDisplay` + `rememberResultEventBusNavEntryDecorator()`
 - [x] `presentation/nav/NavKeys.kt`에 화면 키 정의 (온보딩 / 홈 / 기록 / 랭킹 / 지갑 / 동네 선택) — 각 화면은 `PlaceholderScreen`으로 임시 연결
@@ -150,20 +150,24 @@ worker               WorkManager Worker                     ← 지침 확장
 
 ---
 
-## M4. 화면: 홈 & 기록 (`feature/home`, `feature/history`)
+## M4. 화면: 홈 & 기록 (`feature/m4-home-history`) ✅
 
-`llm-rules/ui/compose-rules.md` + `llm-skills/compose-ui-development.md` 절차를 따른다.
+설계 결정과 대안은 `docs/architecture.md` §5.
 
-- [ ] 홈: 오늘 걸음 + 원형 진행 바, 거리/칼로리/시간 환산, 리워드 구간 버튼(잠김 / 수령 가능 / 수령 완료)
-- [ ] `HomeViewModel`: 걸음 Flow + 목표 + 리워드 상태를 `combine` → `stateIn`
-- [ ] 기록: 일/주/월 탭 + 막대 그래프(Compose Canvas), 목표 달성 일수·평균, 월 이동
-- [ ] 목록 상태는 `ImmutableList`, 수집은 `collectAsStateWithLifecycle()`
-- [ ] `@Preview`로 상태별 화면 확인
+- [x] 홈: 오늘 걸음 + 원형 진행 바, 거리/칼로리/시간 환산, 목표 변경(다이얼로그)
+- [x] `HomeViewModel`: 걸음 Flow + 목표 + 권한을 `combine` → `stateIn`
+- [x] 날짜별 목표 저장(`daily_steps.goal`, Room v2 AutoMigration + 마이그레이션 테스트), 목표는 DataStore
+- [x] 기록: 일/주/월 탭 + 막대 그래프(Compose Canvas), 합계·일 평균·목표 달성 일수, 이전/다음 이동
+- [x] 목록 상태는 `ImmutableList`, 수집은 `collectAsStateWithLifecycle()`
+- [x] `@Preview`로 상태별 화면 확인 (홈 4, 기록 2, 링·그래프 컴포넌트)
+- [x] ViewModel 테스트 (Turbine): 홈 4, 기록 4
+- 변경: 리워드 구간 버튼(잠김/수령 가능/수령 완료)은 서버 상태가 필요해 M5로 이동
 
 ---
 
 ## M5. 리워드 & 지갑 (Mock) (`feature/reward`) ★
 
+- [ ] 홈에 리워드 구간 버튼 (잠김 / 수령 가능 / 수령 완료, M4에서 이동)
 - [ ] 수령 전 최신 걸음 동기화 → 수령 API (Play Integrity 토큰은 Phase B에서 추가)
 - [ ] 낙관적 UI 업데이트 → 실패 시 롤백
 - [ ] 버튼 연타·재시도에도 중복 수령 UI가 생기지 않음 (Mock 멱등 응답으로 검증)

@@ -27,14 +27,16 @@
 | `data/remote/dto` | `@Serializable` DTO (+ M3부터 `toDomain()` 매퍼) | M1 ✅ |
 | `data/remote/mock` | Mock 서버 (Phase A 전용) | M1 ✅ |
 | `data/di` | Hilt 모듈: `NetworkModule`, `TimeModule`, `MockApiModule`, `DatabaseModule`, `SensorModule`, `RepositoryModule` | M2 ✅ |
-| `data/local` | `WorkingAppDatabase`, `dao/StepDao`, `entity/*` (+ 매퍼), `SessionStore`(토큰·닉네임·동네) | M3 ✅ |
+| `data/local` | `WorkingAppDatabase`(v2), `dao/StepDao`, `entity/*` (+ 매퍼), `SessionStore`(토큰·닉네임·동네), `GoalStore`(목표, DataStore) | M4 ✅ |
 | `data/sensor` | `StepDataSource` + `AndroidStepDataSource`(STEP_COUNTER) / `SimulatedStepDataSource`(에뮬레이터) | M2 ✅ |
 | `data/repository` | `StepRepositoryImpl`(측정·동기화), `AccountRepositoryImpl`(가입·동네) | M3 ✅ |
-| `domain/model`, `domain/repository`, `domain/step` | `StepReading`·`DailySteps`·`Region`·`AppError`, `StepRepository`·`AccountRepository`, `StepDeltaCalculator` | M3 ✅ |
+| `domain/model`, `domain/repository`, `domain/step` | `StepReading`·`DailySteps`·`HourlySteps`·`Region`·`AppError`, `StepRepository`·`AccountRepository`·`GoalRepository`, `StepDeltaCalculator`·`StepMetrics` | M4 ✅ |
+| `domain/history` | `HistoryPeriod`·`HistoryRange`·`HistorySummary` (기간 계산·통계, 순수 Kotlin) | M4 ✅ |
 | `presentation/onboarding`, `presentation/region` | 닉네임 → 가입 → 동네 선택(결과는 `ResultEventBus`) | M3 ✅ |
 | `presentation/nav` | `AppNavViewModel`(온보딩 여부로 시작 화면 결정), `RegionResult` | M3 ✅ |
 | `presentation/text/AppErrorText.kt` | `AppError` → `UiText` 매핑 (한 곳에서만) | M3 ✅ |
-| `presentation/home` | 1차 홈 (오늘 걸음, 권한·센서 미지원 상태) — M4에서 확장 | M2 ✅ |
+| `presentation/home` | 홈: 목표 진행 링(`StepProgressRing`), 환산값, 목표 변경(`GoalDialog`), 권한·센서 미지원 상태 | M4 ✅ |
+| `presentation/history` | 기록: 일/주/월 탭, 기간 이동, 합계·평균·달성 일수, Canvas 막대 그래프(`StepBarChart`) | M4 ✅ |
 | `presentation/nav` | `NavKeys.kt`, `AppNavHost.kt` (Navigation 3) | M1 ✅ |
 | `presentation/text` | `UiText` + `asString()` (i18n-safe 메시지) | M1 ✅ |
 | `presentation/placeholder` | 화면 골격용 임시 화면 — 실제 화면이 생기면 삭제 | M1 (임시) |
@@ -133,7 +135,29 @@ AuthApi ─ @AuthClient OkHttpClient: (로깅) → MockApiInterceptor   ← Auth
 - 앱 강제 종료 후 재실행(Mock 상태 소실): `sync 401 → refresh 401 → 재가입 201 → 동네 복원 200 → sync 재시도 200`, 화면 흐름 끊김 없음
 - 계측 테스트: `AuthRenewalTest` 2개(토큰 만료 재발급, 재가입·동네 복원·미동기화), `StepRepositoryImplTest` +2개(업로드 후 synced, 업로드 중 변경 시 미표시)
 
-## 5. Mock 서버 (Phase A)
+## 5. 홈 & 기록 (M4)
+
+### 설계 결정 (선택하지 않은 대안 포함)
+
+| 결정 | 선택 | 선택하지 않은 대안 → 이유 |
+|---|---|---|
+| 달성 판정 기준 | **날짜별 목표를 `daily_steps.goal`에 저장** (그날 첫 기록 시 현재 목표, 목표 변경 시 오늘 행만 갱신) | 현재 목표로 모든 날 판정: 목표를 바꾸면 지난 기록의 달성 여부가 바뀐다. |
+| 스키마 변경 | **Room AutoMigration v1→v2** (`goal` 기본값 10000) + `MigrationTestHelper` 테스트 | 수동 `Migration`: 열 하나 추가는 AutoMigration으로 충분. `fallbackToDestructiveMigration`: 걸음 기록이 지워진다. |
+| 목표 저장소 | **DataStore** (`GoalStore`) | SharedPreferences: 동기 읽기가 필요 없고, Flow로 변경이 바로 화면에 반영되는 DataStore가 설정값에 맞다 (토큰은 동기 읽기 때문에 SharedPreferences, §4). |
+| 기본 목표 | **10,000보** | 6,000~8,000보: 앱이 "만보기"이고 리워드 마지막 구간도 1만 보라 맞춘다. |
+| 환산값 | **평균값 고정**: 보폭 0.7m, 0.04kcal/보, 100보/분 | 키·몸무게 입력: 비범위. |
+| 일 평균 | **기간 시작~오늘까지 지난 날수로 나눔** (기록 없는 날 포함) | 기록 있는 날만으로 나눔: 걷지 않은 날이 빠져 평균이 부풀려진다. |
+| 그래프 | **Compose Canvas 직접 구현** | 차트 라이브러리: 막대 하나 그리는 데 의존성을 늘릴 필요가 없고 직접 그려 보는 것이 학습 목표 (TODO). |
+| 그래프 라벨 | **ViewModel은 막대 값만, 요일·날짜 문구는 Screen이 리소스로 생성** | ViewModel에서 문자열 생성: 지침의 i18n 규칙 위반. |
+| 리워드 구간 버튼 | **M5로 이동** | M4에서 상태만 표시: 버튼 상태(수령 가능/완료)의 원천이 서버라 리워드 API 없이는 의미가 없고 M5에서 다시 고쳐야 한다. |
+
+### 검증
+- 단위 테스트: `StepMetricsTest` 3, `HistoryRangeTest` 5, `HistorySummaryTest` 3, `HomeViewModelTest` 4, `HistoryViewModelTest` 4 (Turbine)
+- 계측 테스트: `MigrationTest` (v1 데이터 → v2 유지·기본 목표), 목표 기록 테스트 (오늘만 변경, 지난날 유지)
+- 에뮬레이터: 목표 3,000보로 변경 → 홈 즉시 반영, 기록 주/일/월 전환·이전/다음 이동, 오늘 포함 기간에서 다음 비활성
+- 확인 못 한 것: 실제 기기에서 v1 DB가 있는 상태로의 업그레이드 (계측 테스트 실행이 에뮬레이터 앱을 지워 새 설치가 됨). 마이그레이션 자체는 `MigrationTest`가 v1 스키마로 검증.
+
+## 6. Mock 서버 (Phase A)
 
 ```
 PedometerApi(Retrofit) → OkHttpClient
@@ -161,11 +185,12 @@ PedometerApi(Retrofit) → OkHttpClient
 2. `AndroidManifest.xml`에 `INTERNET` 권한 추가 (Mock은 실제 네트워크를 쓰지 않아 지금은 없음)
 3. `docs/api.md` 기준으로 Mock과 서버 응답 차이 점검
 
-## 6. 빌드 메모
+## 7. 빌드 메모
 
 - AGP 9 내장 Kotlin + KSP 2.0.x 조합 때문에 `gradle.properties`에 `android.disallowKotlinSourceSets=false`가 필요하다 (실험적 옵션 경고가 뜨는 것은 정상). KSP가 `android.sourceSets` 방식을 지원하면 제거한다.
 - Hilt 2.60 생성 코드가 `@CanIgnoreReturnValue`를 참조해 `error_prone_annotations`를 `compileOnly`로 추가했다.
 - Navigation 3의 `ResultEventBus`는 1.2.0-alpha 라인에만 있어 alpha 버전을 쓴다.
 - Room 스키마는 `app/schemas/`에 내보낸다 (마이그레이션 테스트용, 커밋 대상).
 - KDoc·블록 주석 안에 `/*` 를 쓰지 않는다 (예: `/auth/*`). Kotlin 블록 주석은 중첩되어 주석이 닫히지 않고 뒤의 클래스 전체가 사라진다 — KSP가 "could not be resolved"로만 알려 준다.
+- `connectedDebugAndroidTest`는 테스트가 끝나면 대상 기기의 앱을 **삭제**한다. 기기 데이터로 업그레이드를 확인하려면 계측 테스트 전에 한다.
 - `connectedDebugAndroidTest`는 연결된 **모든 기기**에서 실행된다. 에뮬레이터만 쓰려면 `ANDROID_SERIAL=emulator-5554`를 지정한다.
