@@ -22,6 +22,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.workingapp.R
+import com.example.workingapp.domain.model.WalletReason
 import com.example.workingapp.domain.model.WalletTransaction
 import com.example.workingapp.presentation.text.UiText
 import com.example.workingapp.presentation.text.asString
@@ -81,8 +82,11 @@ private fun BalanceCard(balance: Int) {
 private fun TransactionRow(transaction: WalletTransaction) {
     Row(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(modifier = Modifier.weight(1f)) {
-            val reason = transaction.rewardTier?.let { stringResource(R.string.wallet_reason_reward_tier, TIER_STEPS[it] ?: 0) }
-                ?: stringResource(R.string.wallet_reason_other)
+            val reason = when (val walletReason = transaction.reason) {
+                is WalletReason.RewardTier -> stringResource(R.string.wallet_reason_reward_tier, TIER_STEPS[walletReason.tier] ?: 0)
+                WalletReason.Treasure -> stringResource(R.string.wallet_reason_treasure)
+                WalletReason.Other -> stringResource(R.string.wallet_reason_other)
+            }
             Text(text = reason, style = MaterialTheme.typography.bodyLarge)
             val time = transaction.createdAt
             Text(
@@ -110,8 +114,9 @@ private fun WalletScreenContentPreview() {
             state = WalletUiState.Content(
                 balance = 9,
                 transactions = persistentListOf(
-                    WalletTransaction("t_2", 5, rewardTier = 3, createdAt = OffsetDateTime.parse("2026-10-25T21:30:00+09:00")),
-                    WalletTransaction("t_1", 1, rewardTier = 1, createdAt = OffsetDateTime.parse("2026-10-25T09:05:00+09:00")),
+                    WalletTransaction("t_3", 2, WalletReason.Treasure, createdAt = OffsetDateTime.parse("2026-10-26T21:05:00+09:00")),
+                    WalletTransaction("t_2", 5, WalletReason.RewardTier(3), createdAt = OffsetDateTime.parse("2026-10-25T21:30:00+09:00")),
+                    WalletTransaction("t_1", 1, WalletReason.RewardTier(1), createdAt = OffsetDateTime.parse("2026-10-25T09:05:00+09:00")),
                 ),
             ),
             onRetry = {},

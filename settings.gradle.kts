@@ -19,6 +19,10 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // 네이버 지도 SDK
+        maven("https://repository.map.naver.com/archive/maven") {
+            content { includeGroup("com.naver.maps") }
+        }
     }
 }
 

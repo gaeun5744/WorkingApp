@@ -12,6 +12,9 @@ import com.example.workingapp.data.remote.dto.RewardsTodayResponse
 import com.example.workingapp.data.remote.dto.StepsSyncRequest
 import com.example.workingapp.data.remote.dto.StepsSyncResponse
 import com.example.workingapp.data.remote.dto.TokenResponse
+import com.example.workingapp.data.remote.dto.TreasureOpenRequest
+import com.example.workingapp.data.remote.dto.TreasureOpenResponse
+import com.example.workingapp.data.remote.dto.TreasuresNearbyResponse
 import com.example.workingapp.data.remote.dto.UpdateRegionRequest
 import com.example.workingapp.data.remote.dto.WalletResponse
 import kotlinx.serialization.KSerializer
@@ -51,6 +54,14 @@ internal class MockApiInterceptor @Inject constructor(
     private fun route(request: Request): Response {
         val path = request.url.encodedPath
         val authorization = request.header(AUTHORIZATION)
+        TREASURE_OPEN_PATH.matchEntire(path)?.let { match ->
+            if (request.method != "POST") return@let
+            return request.authorized(authorization) { userId ->
+                request.withBody(TreasureOpenRequest.serializer()) { body ->
+                    request.respond(server.openTreasure(userId, match.groupValues[1], body), TreasureOpenResponse.serializer())
+                }
+            }
+        }
         return when (request.method to path) {
             "POST" to "/auth/anonymous" -> request.withBody(AnonymousSignUpRequest.serializer()) { body ->
                 request.respond(server.signUpAnonymous(body.nickname), TokenResponse.serializer())
@@ -85,6 +96,11 @@ internal class MockApiInterceptor @Inject constructor(
             }
             "GET" to "/wallet" -> request.authorized(authorization) { userId ->
                 request.respond(server.getWallet(userId), WalletResponse.serializer())
+            }
+            "GET" to "/treasures/nearby" -> request.authorized(authorization) { userId ->
+                val latitude = request.url.queryParameter("latitude")?.toDoubleOrNull()
+                val longitude = request.url.queryParameter("longitude")?.toDoubleOrNull()
+                request.respond(server.getNearbyTreasures(userId, latitude, longitude), TreasuresNearbyResponse.serializer())
             }
             "GET" to "/ranking" -> request.authorized(authorization) { userId ->
                 val period = request.url.queryParameter("period").orEmpty()
@@ -142,6 +158,7 @@ internal class MockApiInterceptor @Inject constructor(
 
     private companion object {
         const val AUTHORIZATION = "Authorization"
+        val TREASURE_OPEN_PATH = Regex("/treasures/([^/]+)/open")
         val JSON_MEDIA_TYPE = "application/json".toMediaType()
     }
 }

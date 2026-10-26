@@ -179,21 +179,49 @@ worker               WorkManager Worker                     ← 지침 확장
 
 ---
 
-## M6. 동네 랭킹 (Mock) (`feature/ranking`)
+## M6. 동네걷기 지도 & 보물상자 (Mock) (`feature/m6-walk-map`) ✅
+
+원본 당근 "동네걷기"의 지도 미션을 참고한다 (PRD Q20~Q25). 설계 결정과 대안은 `docs/architecture.md` §7.
+
+### 6-1. 사전 준비
+- [x] 네이버 클라우드 플랫폼 Maps Client ID (사용자 발급) → `local.properties`의 `NAVER_MAP_CLIENT_ID` → `manifestPlaceholders` → `com.naver.maps.map.NCP_KEY_ID`
+- [x] 네이버 지도 SDK 3.24.0 + `play-services-location` 21.3.0, `libnavermap.so` 16KB 정렬 확인 (LOAD·RELRO 모두 정렬)
+
+### 6-2. API 계약 & Mock
+- [x] `docs/api.md`: `GET /treasures/nearby?latitude&longitude`(주변 3×3칸), `POST /treasures/{id}/open`, 에러 코드
+- [x] Mock: 위경도 0.005도 격자 칸마다 (칸, 날짜) 시드로 2개 결정적 생성, id 로 위치 재계산해 검증(날짜 → 멱등 → 하루 5개 상한 → 가짜 GPS → 정확도 → 거리 → 이동 속도), 2P 적립(`TREASURE`)
+- [x] 단위 테스트 (`GeoCellTest` 4, `MockTreasureTest` 9)
+- 변경: 처음에는 동네 중심 반경 1km(Q22)로 구현했으나, 동네(목록 선택)와 실제 위치가 다를 수 있어 동네와 무관한 격자 방식으로 바꿈 (Q25). 동네는 랭킹 전용
+
+### 6-3. 앱
+- [x] `LocationRepository`(`FusedLocationRepository`, 구독 중에만 요청) + 테스트용 Fake
+- [x] 위치 권한 흐름: 정확 / 대략적(상자 보기만, 열기 불가) / 거부(요청·설정 이동)
+- [x] `TreasureRepository`, 지갑 적립 사유 `WalletReason`(리워드 구간 / 보물상자 / 기타)
+- [x] 동네걷기 지도 화면: 네이버 지도, 내 위치 중심, 상자 마커(열림 반투명), 가장 가까운 상자 거리, 오늘 N/5개
+- [x] 다른 칸에 들어서면 주변 상자 재조회 (이전 요청 취소)
+- [x] 50m 안이면 열기 활성화 → 서버 검증 → 결과 안내, 연타 방지
+- [x] 홈에서 지도 화면 진입
+- [x] 에뮬레이터: 동네(역삼동)와 다른 곳(해운대)에서 주변 상자 표시·열기 / 순간이동 거부 / 칸 이동 시 재조회 (`adb emu geo fix`)
+- [x] ViewModel 테스트 (`WalkMapViewModelTest` 10)
+- 남음(알려진 한계): 바다·강 등 걸어갈 수 없는 곳에도 상자가 생김 — 장소(POI)·도로 데이터가 필요해 Phase B(M9)에서 결정
+
+---
+
+## M7. 동네 랭킹 (Mock) (`feature/ranking`)
 
 - [ ] 일간/주간 탭, 상위 50 리스트 + 내 순위 고정 표시
 - [ ] 5분 캐시 (메모리 또는 Room)
 - [ ] 빈 랭킹 / 동네 미설정 상태 UI
 
 ### Phase A 완료 기준
-- [ ] Mock 서버로 PRD 수용 기준 중 앱 쪽 시나리오(재부팅·자정 유지, 오프라인 후 동기화, 중복 수령 방지, 랭킹 조회) 확인
+- [ ] Mock 서버로 PRD 수용 기준 중 앱 쪽 시나리오(재부팅·자정 유지, 오프라인 후 동기화, 중복 수령 방지, 보물상자 열기·위치 검증, 랭킹 조회) 확인
 - [ ] `develop` → `main` 머지
 
 ---
 
 # Phase B — 서버 & 전환
 
-## M7. 서버 기반: 인증 & 걸음 API (`feature/server-setup`)
+## M8. 서버 기반: 인증 & 걸음 API (`feature/server-setup`)
 
 - [ ] 서버용 에이전트 지침 작성: `.agents/llm-rules/server/` (레이어 구조, JPA·트랜잭션, 예외 처리, 테스트 규칙) + `AGENTS.md` 라우팅 표 갱신
 - [ ] `server/` Spring Boot(Kotlin) 프로젝트 생성 (앱과 독립 Gradle 빌드)
@@ -213,7 +241,7 @@ worker               WorkManager Worker                     ← 지침 확장
 - [ ] 검증 규칙: 하루 100,000 / 시간당 12,000 상한, 미래 날짜·시간대 거부, 최근 7일 밖 거부, 초과분 자르고 `suspicious` 기록
 - [ ] 테스트: 같은 요청 반복, 동시 요청, 경계값 (Testcontainers PostgreSQL)
 
-## M8. 리워드 & Play Integrity (`feature/server-reward`) ★
+## M9. 리워드 & Play Integrity (`feature/server-reward`) ★
 
 - [ ] `POST /rewards/claim`: 서버 `daily_steps`로만 구간 도달 판정, 오늘(KST) 것만 허용
 - [ ] 한 트랜잭션에서 `reward_claims` insert(유니크 제약) + 지갑 잔액·내역 갱신, 중복 요청은 기존 결과 반환
@@ -221,8 +249,11 @@ worker               WorkManager Worker                     ← 지침 확장
 - [ ] 서버: Play Integrity 토큰 검증, 실패 시 지급 거부 / 로컬 개발용 검증 끄기 설정
 - [ ] 앱: 수령 시 Play Integrity 토큰 요청 → `integrityToken` 전송 (`docs/api.md` 필수화)
 - [ ] 테스트: 동시 수령 요청에도 1회만 적립
+- [ ] 보물상자: (격자 칸, 날짜) 결정적 생성, 열기 서버 검증(하루 상한·거리·정확도·가짜 GPS·이동 속도), `(user, treasure)` 유니크로 멱등, 열기 위치·시각 기록
+- [ ] 앱: 보물상자 열기에도 Play Integrity 토큰 첨부
+- [ ] 보물상자 배치 개선 결정: 바다·강 등 걸어갈 수 없는 곳 제외 (장소(POI)·도로 데이터 기반 배치 등, M6 알려진 한계)
 
-## M9. Redis 랭킹 (`feature/server-ranking`) ★
+## M10. Redis 랭킹 (`feature/server-ranking`) ★
 
 - [ ] Redis 키: `rank:daily:{regionId}:{date}`, `rank:weekly:{regionId}:{weekStart}` (월요일 시작, KST) + TTL
 - [ ] 걸음 upsert 시 일간 `ZADD GT`, 주간은 실제 증가분만 `ZINCRBY`
@@ -230,14 +261,14 @@ worker               WorkManager Worker                     ← 지침 확장
 - [ ] PostgreSQL → Redis 랭킹 재구축 기능
 - [ ] 테스트: Redis 초기화 후 재구축 결과 일치
 
-## M10. 앱 Mock → 실제 서버 전환 (`feature/switch-to-server`)
+## M11. 앱 Mock → 실제 서버 전환 (`feature/switch-to-server`)
 
 - [ ] `USE_MOCK_API = false`, 빌드 타입별 base URL (로컬 `10.0.2.2` / 운영 HTTPS)
 - [ ] Mock과 실제 서버 응답 차이 점검 (`docs/api.md` 기준), 차이는 계약 문서부터 수정
 - [ ] `data/remote/mock` 유지 여부 결정 (테스트·데모용으로 debug 전용 유지 vs 삭제)
 - [ ] 검증: 로컬 Docker Compose 서버로 PRD 수용 기준 전체 시나리오
 
-## M11. 클라우드 배포 (`feature/deploy`)
+## M12. 클라우드 배포 (`feature/deploy`)
 
 - [ ] VM 1대 준비(EC2/Lightsail/GCE 중 택1) + 도메인 연결
 - [ ] 운영용 Docker Compose + Caddy(HTTPS 자동 발급)
@@ -273,12 +304,13 @@ worker               WorkManager Worker                     ← 지침 확장
 | M3 | 걸음이 Mock 서버와 동기화된다 | 앱 + Mock |
 | M4 | 화면에서 걸음과 기록을 본다 | 앱 |
 | M5 | 리워드를 중복 없이 받는다 | 앱 + Mock |
-| M6 | 동네 랭킹으로 비교한다 | 앱 + Mock |
+| M6 | 동네를 걸어 보물상자를 연다 | 앱 + Mock + 네이버 지도 |
+| M7 | 동네 랭킹으로 비교한다 | 앱 + Mock |
 | **Phase B** | | |
-| M7 | 서버가 인증과 걸음 업로드를 받는다 | 서버 |
-| M8 | 리워드를 안전하게 지급한다 | 서버 + 앱 + Play Integrity |
-| M9 | Redis로 랭킹을 집계한다 | 서버 + Redis |
-| M10 | 앱이 실제 서버로 동작한다 | 앱 + 서버 |
-| M11 | 운영 서버에서 전체가 동작한다 | 인프라 |
+| M8 | 서버가 인증과 걸음 업로드를 받는다 | 서버 |
+| M9 | 리워드를 안전하게 지급한다 | 서버 + 앱 + Play Integrity |
+| M10 | Redis로 랭킹을 집계한다 | 서버 + Redis |
+| M11 | 앱이 실제 서버로 동작한다 | 앱 + 서버 |
+| M12 | 운영 서버에서 전체가 동작한다 | 인프라 |
 
 각 마일스톤 완료 시 `develop` → `main` 머지.

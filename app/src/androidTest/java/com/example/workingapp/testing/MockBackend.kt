@@ -10,6 +10,7 @@ import com.example.workingapp.data.remote.mock.MockApiConfig
 import com.example.workingapp.data.remote.mock.MockApiInterceptor
 import com.example.workingapp.data.remote.mock.MockNeighborSteps
 import com.example.workingapp.data.remote.mock.MockServer
+import com.example.workingapp.data.remote.mock.MockTreasureField
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -31,7 +32,7 @@ internal class MockBackend(clock: Clock, sessionStore: SessionStore, stepDao: St
         accessTokenTtl = Duration.ofMinutes(10),
         refreshTokenTtl = Duration.ofDays(30),
     )
-    private val mock = MockApiInterceptor(MockServer(clock, config, MockNeighborSteps()), config, json)
+    private val mock = MockApiInterceptor(MockServer(clock, config, MockNeighborSteps(), MockTreasureField()), config, json)
 
     private val authClient = OkHttpClient.Builder().addInterceptor(mock).build()
     private val authApi = retrofit(authClient).create(AuthApi::class.java)
