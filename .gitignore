@@ -19,3 +19,5 @@ local.properties
 /.idea/inspectionProfiles/
 /.idea/markdown.xml
 /.idea/vcs.xml
+/.idea/deploymentTargetSelector.xml
+/.idea/misc.xml
