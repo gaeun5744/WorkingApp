@@ -10,12 +10,16 @@ import com.example.workingapp.data.remote.dto.RewardsTodayResponse
 import com.example.workingapp.data.remote.dto.StepsSyncRequest
 import com.example.workingapp.data.remote.dto.StepsSyncResponse
 import com.example.workingapp.data.remote.dto.TokenResponse
+import com.example.workingapp.data.remote.dto.TreasureOpenRequest
+import com.example.workingapp.data.remote.dto.TreasureOpenResponse
+import com.example.workingapp.data.remote.dto.TreasuresNearbyResponse
 import com.example.workingapp.data.remote.dto.UpdateRegionRequest
 import com.example.workingapp.data.remote.dto.WalletResponse
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.PUT
+import retrofit2.http.Path
 import retrofit2.http.Query
 
 /**
@@ -47,6 +51,15 @@ interface PedometerApi {
 
     @GET("wallet")
     suspend fun getWallet(): WalletResponse
+
+    @GET("treasures/nearby")
+    suspend fun getNearbyTreasures(
+        @Query("latitude") latitude: Double,
+        @Query("longitude") longitude: Double,
+    ): TreasuresNearbyResponse
+
+    @POST("treasures/{id}/open")
+    suspend fun openTreasure(@Path("id") treasureId: String, @Body request: TreasureOpenRequest): TreasureOpenResponse
 
     @GET("ranking")
     suspend fun getRanking(@Query("period") period: String): RankingResponse

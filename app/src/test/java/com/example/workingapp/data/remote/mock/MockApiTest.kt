@@ -64,7 +64,7 @@ class MockApiTest {
     }
 
     private fun createRetrofit(config: MockApiConfig): Retrofit {
-        val server = MockServer(clock, config, MockNeighborSteps())
+        val server = MockServer(clock, config, MockNeighborSteps(), MockTreasureField())
         val client = OkHttpClient.Builder()
             .addInterceptor { chain ->
                 val request = chain.request()

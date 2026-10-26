@@ -37,7 +37,10 @@
 | `presentation/text/AppErrorText.kt` | `AppError` → `UiText` 매핑 (한 곳에서만) | M3 ✅ |
 | `presentation/home` | 홈: 목표 진행 링(`StepProgressRing`), 환산값, 목표 변경(`GoalDialog`), 권한·센서 미지원 상태 | M4 ✅ |
 | `presentation/home/components/RewardTiersCard` | 리워드 구간 버튼 (잠김/받기/받음) | M5 ✅ |
-| `presentation/wallet` | 지갑: 잔액 + 적립 내역 | M5 ✅ |
+| `presentation/wallet` | 지갑: 잔액 + 적립 내역 (리워드 구간 / 보물상자 / 기타) | M6 ✅ |
+| `presentation/walkmap` | 동네걷기 지도: 네이버 지도(`NaverMapView`), 보물상자 열기, 위치 권한 상태 | M6 ✅ |
+| `data/location` | `FusedLocationRepository` (구독 중에만 위치 요청) | M6 ✅ |
+| `domain/geo` | 하버사인 거리, 미터 단위 좌표 이동 | M6 ✅ |
 | `presentation/history` | 기록: 일/주/월 탭, 기간 이동, 합계·평균·달성 일수, Canvas 막대 그래프(`StepBarChart`) | M4 ✅ |
 | `presentation/nav` | `NavKeys.kt`, `AppNavHost.kt` (Navigation 3) | M1 ✅ |
 | `presentation/text` | `UiText` + `asString()` (i18n-safe 메시지) | M1 ✅ |
@@ -189,7 +192,52 @@ AuthApi ─ @AuthClient OkHttpClient: (로깅) → MockApiInterceptor   ← Auth
 - 에뮬레이터: 1구간 수령 — 탭 0.3초 뒤 "받음"(응답 전 낙관적 반영), 요청 순서 `steps/sync → rewards/claim → rewards/today`, 받은 뒤 연타 시 추가 요청 0건, Snackbar "1P 적립! 잔액 1P", 지갑 잔액 1P·내역 "1,000보 리워드"
 - 에뮬레이터: 동시 401(`/rewards/today` + `/steps/sync`)에도 리프레시·재가입은 1회 (M3 잠금 확인)
 
-## 7. Mock 서버 (Phase A)
+## 7. 동네걷기 지도 & 보물상자 (M6)
+
+상자는 동네와 관계없이 어디에나 있다 (PRD Q25). 동네는 랭킹에만 쓴다.
+
+```
+WalkMapRoute ── 위치 권한(정확/대략/거부) 확인·요청, Snackbar
+   └ WalkMapViewModel
+        permission ─flatMapLatest→ LocationRepository.locationUpdates()   (권한 있을 때만, WhileSubscribed 로 화면이 사라지면 해제)
+            └ 다른 격자 칸(GeoCell, 0.005도)에 들어서면 TreasureRepository.getNearbyTreasures(내 위치)  ← 이전 요청은 취소
+        combine → 상자별 거리, 가장 가까운 닫힌 상자, 열기 가능 여부(정확한 위치 + 실제 거리 ≤ 50m + 정확도 ≤ 50m + 하루 5개 미만)
+        onOpenNearest → TreasureRepository.open(id, 현재 위치) → 성공 시에만 열림 반영
+   └ NaverMapView (AndroidView + MapView 생명주기 직접 전달) ── 상자 마커, 내 위치 (처음 위치를 알 때 카메라 이동)
+Mock: MockTreasureField((칸, 날짜) 시드 → 칸마다 2개, id = 칸_날짜_번호) + MockServer(주변 3×3칸 조회, id 로 위치 재계산해 검증 → 적립)
+```
+
+### 설계 결정 (선택하지 않은 대안 포함)
+
+| 결정 | 선택 | 선택하지 않은 대안 → 이유 |
+|---|---|---|
+| 상자 배치 범위 | **동네와 무관, 어디에나** (Q25) | 동네 중심 반경 1km(Q22, 처음 구현): 동네는 목록 선택이라 실제 위치와 달라 다른 곳에서는 미션을 못 한다 (에뮬레이터에서 발견). |
+| 공간 분할 | **위경도 0.005도 격자 칸** | 지오해시: 인코딩·이웃 계산이 필요하고 정밀도마다 칸 모양이 다르다 (서버 저장·검색이 필요해지면 재검토). H3 육각형: 네이티브 의존성. 내 위치 기준 생성: 사람마다 상자가 달라지고 제자리 재요청으로 남용된다. |
+| 상자 위치 저장 | **(칸, 날짜) 시드로 매번 같은 위치 생성, 상자 id 에 칸·날짜를 담아 서버가 위치를 다시 계산** | 날마다 생성해 저장: 칸이 무한해 미리 만들 수 없고, 저장소·배치가 필요하다. |
+| 조회 범위 | **내 위치 칸 + 주변 8칸(3×3, 약 1.5km)**, 다른 칸에 들어서면 다시 조회 | 지도 화면 영역(viewport) 기준: 지도를 크게 축소하면 요청 칸 수가 폭증한다. 위치가 바뀔 때마다 조회: 같은 칸 안의 이동은 결과가 같아 낭비. |
+| 하루 상한 | **5개(10P)** | 상한 없음: 상자가 무한해 보상이 무한해진다. |
+| 지도 Compose 연동 | **`AndroidView` + `MapView` 생명주기 직접 전달** | 비공식 Compose 래퍼: 지도 SDK 버전에 묶이는 의존성이 하나 더 생긴다. |
+| 열기 반영 | **서버 응답 후 반영 (낙관적 반영 안 함)** | 낙관적 반영(M5 리워드 방식): 위치 검증으로 거절될 수 있어 되돌림이 잦고 사용자를 혼란스럽게 한다. |
+| 열기 버튼 판정 | **앱도 서버와 같은 기준(실제 거리 ≤ 50m, 정확도 ≤ 50m, 상한 미만)으로 활성화, 최종 판정은 서버** | 표시용 반올림 거리로 판정: 50.4m 를 50m 로 보고 켜졌다가 서버가 거절한다 (테스트로 발견해 수정). |
+| 이동 속도 기준 시각 | **서버 수신 시각** | 앱이 보낸 `measuredAt`: 기기 시계를 바꾸면 우회된다. |
+| 이미 연 상자 | **위치·상한 검사보다 먼저 멱등 응답(`alreadyOpened`)** | 위치부터 검사: 재시도할 때 위치가 바뀌었으면 이미 받은 보상에 오류가 뜬다. |
+| 오늘 연 개수 | **상자 id 의 날짜로 세기** (따로 저장 안 함) | 사용자별 날짜 카운터: 열기 기록과 이중으로 관리해야 한다. |
+| 위치 사용 범위 | **지도 화면 구독 중에만 Fused Location 요청** (백그라운드 위치·FGS location 없음) | 백그라운드 위치: 권한·배터리·개인정보 부담 (PRD Q20). |
+| 대략적 위치만 허용 | **주변 상자는 보이되 열기 불가 + 설정 안내** | 지도 자체를 막음: 상자 위치 확인은 대략적 위치로도 의미가 있다. |
+| Client ID | **`local.properties` → `manifestPlaceholders` → `NCP_KEY_ID` meta-data** | 코드에 하드코딩: 키가 Git에 남는다. |
+
+### 알려진 한계
+- **걸어갈 수 없는 곳의 상자**: 칸 안에서 무작위로 위치를 정해 바다·강·건물 안에도 상자가 생긴다 (에뮬레이터 해운대에서 확인). 원본은 가게 근처에 두는데, 그러려면 장소(POI)·도로 데이터가 필요하다.
+- 위도가 높을수록 칸의 동서 폭이 줄어든다 (국내 범위에서는 차이가 작다).
+
+### 검증
+- 단위 테스트: `GeoCellTest` 4, `GeoDistanceTest` 3, `MockTreasureTest` 9 (어디서나 3×3칸 18개, 결정성·날짜별 변경, 열기·멱등, 거리/가짜 GPS/정확도 거부, 하루 5개 상한, 순간이동 거부 후 허용, 날짜·id 검사, 좌표 검증), `WalkMapViewModelTest` 10 (열기 가능 판정·반올림 경계·상한, 대략적 위치, 권한 없으면 위치·상자 미요청, 칸이 바뀔 때만 재조회, 열기 성공·거부, 연타)
+- 에뮬레이터(Pixel 8 API 37, `adb emu geo fix`)
+  - 역삼동 기준 구현(Q22)에서: 174m에서 열기 비활성 → 상자 옆 열기 성공 → 630m 순간이동 후 `TREASURE_TOO_FAST` 거부 안내
+  - 격자 방식(Q25)에서: 동네를 역삼동으로 설정하고 **부산 해운대**에서 지도를 열자 해운대 주변 상자 표시(가장 가까운 126m) → 상자 7m 옆에서 열기 성공(1/5) → 칸 경계를 넘을 때마다 `/treasures/nearby` 재조회
+  - 확인 못 함: 같은 칸 안 이동 시 재조회하지 않는 것(단위 테스트로만 검증), 가짜 GPS 거부(`geo fix`는 모의 위치로 표시되지 않음)
+
+## 8. Mock 서버 (Phase A)
 
 ```
 PedometerApi(Retrofit) → OkHttpClient
@@ -211,19 +259,19 @@ PedometerApi(Retrofit) → OkHttpClient
 - **알려진 한계**: 상태가 메모리에만 있어 앱 프로세스가 재시작되면 사용자·지갑이 사라진다. 이때 저장된 토큰은 `401 UNAUTHORIZED` → 재발급 실패 → 재가입 흐름을 타게 되는데, 이는 M3에서 다룰 인증 실패 처리의 테스트 케이스로 활용한다.
 - **검증**: `MockApiTest` — Retrofit → OkHttp → Interceptor 전체 경로로 계약 규칙 13가지를 확인한다.
 
-### 실제 서버로 전환 (M10)
+### 실제 서버로 전환 (M11)
 
 1. `app/build.gradle.kts`에서 `USE_MOCK_API = false`, `BASE_URL`을 빌드 타입별 서버 주소로 변경
 2. `AndroidManifest.xml`에 `INTERNET` 권한 추가 (Mock은 실제 네트워크를 쓰지 않아 지금은 없음)
 3. `docs/api.md` 기준으로 Mock과 서버 응답 차이 점검
 
-## 8. 빌드 메모
+## 9. 빌드 메모
 
 - AGP 9 내장 Kotlin + KSP 2.0.x 조합 때문에 `gradle.properties`에 `android.disallowKotlinSourceSets=false`가 필요하다 (실험적 옵션 경고가 뜨는 것은 정상). KSP가 `android.sourceSets` 방식을 지원하면 제거한다.
 - Hilt 2.60 생성 코드가 `@CanIgnoreReturnValue`를 참조해 `error_prone_annotations`를 `compileOnly`로 추가했다.
 - Navigation 3의 `ResultEventBus`는 1.2.0-alpha 라인에만 있어 alpha 버전을 쓴다.
 - Room 스키마는 `app/schemas/`에 내보낸다 (마이그레이션 테스트용, 커밋 대상).
 - KDoc·블록 주석 안에 `/*` 를 쓰지 않는다 (예: `/auth/*`). Kotlin 블록 주석은 중첩되어 주석이 닫히지 않고 뒤의 클래스 전체가 사라진다 — KSP가 "could not be resolved"로만 알려 준다.
-- 16KB 페이지 호환성: `datastore-preferences` 1.2.0 의 `libdatastore_shared_counter.so`(RELRO 미정렬)와 `libandroidx.graphics.path.so`가 16KB 정렬이 아니어서 API 37 에뮬레이터에서 호환 모드 경고가 뜬다. 앱은 동작하지만 후속 처리 필요 (TODO 공통 항목).
+- 16KB 페이지 호환성: 모든 `.so`의 LOAD 세그먼트는 16KB 정렬이지만, `libdatastore_shared_counter.so`(datastore 1.2.0)와 `libandroidx.graphics.path.so`(Compose)의 **GNU_RELRO 끝이 4KB 단위**라 API 37 에뮬레이터에서 호환 모드 경고가 뜬다. `libnavermap.so`(3.24.0)는 RELRO까지 16KB 정렬. 앱은 동작하지만 후속 처리 필요 (TODO 공통 항목).
 - `connectedDebugAndroidTest`는 테스트가 끝나면 대상 기기의 앱을 **삭제**한다. 기기 데이터로 업그레이드를 확인하려면 계측 테스트 전에 한다.
 - `connectedDebugAndroidTest`는 연결된 **모든 기기**에서 실행된다. 에뮬레이터만 쓰려면 `ANDROID_SERIAL=emulator-5554`를 지정한다.

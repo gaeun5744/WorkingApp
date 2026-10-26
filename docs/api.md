@@ -31,6 +31,12 @@
 | 401 | `INVALID_REFRESH_TOKEN` | 리프레시 토큰 무효·만료 → 익명 재가입 |
 | 404 | `NOT_FOUND` | 리소스 없음 (예: 존재하지 않는 동네) |
 | 409 | `REGION_NOT_SET` | 동네 미설정 상태에서 랭킹 요청 |
+| 400 | `TREASURE_TOO_FAR` | 보물상자에서 50m 넘게 떨어짐 |
+| 400 | `TREASURE_LOW_ACCURACY` | 위치 정확도가 50m보다 나쁨 |
+| 400 | `TREASURE_MOCK_LOCATION` | 가짜 GPS로 측정된 위치 |
+| 400 | `TREASURE_TOO_FAST` | 직전 상자 열기 이후 이동 속도가 시속 20km 초과 (순간이동) |
+| 400 | `TREASURE_NOT_TODAY` | 오늘(KST) 상자가 아님 |
+| 400 | `TREASURE_DAILY_LIMIT` | 오늘 열 수 있는 상자 수(5개)를 다 씀 |
 | 500 | `INTERNAL_ERROR` | 서버 오류 (Mock 오류 주입 포함) |
 
 ---
@@ -178,7 +184,7 @@
 ```json
 { "date": "2026-10-25", "tier": 3, "integrityToken": null }
 ```
-- `integrityToken`: Phase A에서는 선택(무시됨), Phase B(M8)에서 필수
+- `integrityToken`: Phase A에서는 선택(무시됨), Phase B(M9)에서 필수
 
 응답 `200`
 ```json
@@ -200,6 +206,68 @@
 }
 ```
 - `transactions`: 최신순
+
+---
+
+## 보물상자 (동네걷기 지도)
+
+규칙 (PRD Q20~Q25, §6)
+- 상자는 동네와 관계없이 **어디에나** 있다. 지도를 위경도 **0.005도 격자 칸**으로 나누고, (칸, 날짜) 시드로 칸마다 하루 2개를 만든다 → 같은 장소·같은 날이면 누구에게나 같은 위치
+  - 칸 번호: `latIndex = floor(latitude / 0.005)`, `lngIndex = floor(longitude / 0.005)` (음수 가능)
+- 상자 `id`: `{latIndex}_{lngIndex}-{yyyyMMdd}-{index}` (예: `7500_25407-20261026-1`). 서버는 id만으로 칸·날짜를 알고 위치를 다시 계산해 검증한다 (상자 위치를 저장하지 않음)
+- 1개 2P, 열면 지갑에 적립 (`reason`: `TREASURE`). **하루 최대 5개** 열기 (10P)
+
+### `GET /treasures/nearby?latitude={위도}&longitude={경도}`
+
+주어진 위치가 속한 칸과 주변 8칸(3×3)의 오늘(KST) 상자.
+
+응답 `200`
+```json
+{
+  "date": "2026-10-26",
+  "openRadiusMeters": 50,
+  "dailyOpenLimit": 5,
+  "openedToday": 1,
+  "treasures": [
+    { "id": "7500_25407-20261026-0", "latitude": 37.50162, "longitude": 127.03712, "points": 2, "opened": false }
+  ]
+}
+```
+- `opened`: 내가 오늘 이미 연 상자인지
+- `openedToday`: 오늘 내가 연 상자 수 (상한까지 남은 개수 표시용)
+
+에러: `400 VALIDATION_ERROR`(좌표 없음·범위 밖)
+
+### `POST /treasures/{id}/open`
+
+요청
+```json
+{
+  "latitude": 37.50165,
+  "longitude": 127.03710,
+  "accuracyMeters": 12.5,
+  "isMock": false,
+  "measuredAt": "2026-10-26T21:05:12+09:00",
+  "integrityToken": null
+}
+```
+- `isMock`: 기기가 알려 준 가짜 위치 여부 (`Location.isMock`)
+- `measuredAt`: 참고용. **이동 속도 검사는 조작할 수 없는 서버 수신 시각으로 한다**
+
+서버 검증 순서
+1. id 형식이 맞고 오늘(KST) 상자인지 → `404 NOT_FOUND` / `400 TREASURE_NOT_TODAY`
+2. 이미 연 상자면 **위치·상한 검사 없이** `alreadyOpened: true`로 성공 응답 (멱등)
+3. 오늘 연 상자가 5개면 → `TREASURE_DAILY_LIMIT`
+4. `isMock` → `TREASURE_MOCK_LOCATION`
+5. `accuracyMeters` > 50 → `TREASURE_LOW_ACCURACY`
+6. 상자까지 거리 > 50m → `TREASURE_TOO_FAR`
+7. 직전 열기 위치·서버 시각 대비 속도 > 시속 20km → `TREASURE_TOO_FAST`
+8. 통과하면 적립하고 열기 위치·시각을 기록
+
+응답 `200`
+```json
+{ "treasureId": "7500_25407-20261026-0", "points": 2, "balance": 11, "alreadyOpened": false }
+```
 
 ---
 

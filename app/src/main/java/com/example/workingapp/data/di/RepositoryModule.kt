@@ -4,10 +4,12 @@ import com.example.workingapp.data.repository.AccountRepositoryImpl
 import com.example.workingapp.data.repository.GoalRepositoryImpl
 import com.example.workingapp.data.repository.RewardRepositoryImpl
 import com.example.workingapp.data.repository.StepRepositoryImpl
+import com.example.workingapp.data.repository.TreasureRepositoryImpl
 import com.example.workingapp.domain.repository.AccountRepository
 import com.example.workingapp.domain.repository.GoalRepository
 import com.example.workingapp.domain.repository.RewardRepository
 import com.example.workingapp.domain.repository.StepRepository
+import com.example.workingapp.domain.repository.TreasureRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -33,4 +35,8 @@ internal abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindRewardRepository(impl: RewardRepositoryImpl): RewardRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindTreasureRepository(impl: TreasureRepositoryImpl): TreasureRepository
 }

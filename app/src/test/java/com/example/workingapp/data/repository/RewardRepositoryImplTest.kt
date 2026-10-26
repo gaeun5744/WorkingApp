@@ -8,9 +8,11 @@ import com.example.workingapp.data.remote.mock.MockApiConfig
 import com.example.workingapp.data.remote.mock.MockApiInterceptor
 import com.example.workingapp.data.remote.mock.MockNeighborSteps
 import com.example.workingapp.data.remote.mock.MockServer
+import com.example.workingapp.data.remote.mock.MockTreasureField
 import com.example.workingapp.data.remote.mock.MutableClock
 import com.example.workingapp.domain.model.AppError
 import com.example.workingapp.domain.model.RewardStatus
+import com.example.workingapp.domain.model.WalletReason
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
@@ -38,7 +40,7 @@ class RewardRepositoryImplTest {
                 val request = chain.request()
                 chain.proceed(token?.let { request.newBuilder().header("Authorization", "Bearer $it").build() } ?: request)
             }
-            .addInterceptor(MockApiInterceptor(MockServer(clock, config, MockNeighborSteps()), config, json))
+            .addInterceptor(MockApiInterceptor(MockServer(clock, config, MockNeighborSteps(), MockTreasureField()), config, json))
             .build()
         Retrofit.Builder()
             .baseUrl("https://mock.workingapp.local/")
@@ -66,7 +68,7 @@ class RewardRepositoryImplTest {
         assertEquals(5, claim.balance)
 
         val wallet = repository.getWallet().getOrThrow()
-        assertEquals(3, wallet.transactions.single().rewardTier)
+        assertEquals(WalletReason.RewardTier(3), wallet.transactions.single().reason)
         assertEquals(OffsetDateTime.parse("2026-10-25T14:00:00+09:00"), wallet.transactions.single().createdAt)
     }
 

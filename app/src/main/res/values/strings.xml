@@ -47,11 +47,35 @@
     <string name="reward_error_not_reached">서버에 아직 걸음이 반영되지 않았어요. 잠시 후 다시 시도해 주세요</string>
     <string name="reward_error_not_today">날짜가 바뀌었어요. 오늘 리워드를 확인해 주세요</string>
 
+    <string name="screen_walk_map">동네걷기</string>
+    <string name="treasure_opened">보물상자에서 %1$dP 적립! 잔액 %2$dP</string>
+    <string name="treasure_already_opened">이미 연 보물상자예요</string>
+    <string name="treasure_error_too_far">보물상자에 조금 더 가까이 가 주세요</string>
+    <string name="treasure_error_low_accuracy">위치가 정확하지 않아요. 하늘이 보이는 곳에서 다시 시도해 주세요</string>
+    <string name="treasure_error_mock_location">가짜 위치로는 열 수 없어요</string>
+    <string name="treasure_error_too_fast">이동이 너무 빨라요. 잠시 후 다시 시도해 주세요</string>
+    <string name="treasure_error_daily_limit">오늘 열 수 있는 보물상자를 모두 열었어요</string>
+    <string name="treasure_error_not_today">날짜가 바뀌어 새 보물상자를 불러왔어요</string>
+    <string name="walk_map_title">내 주변 보물상자</string>
+    <string name="walk_map_progress">오늘 %1$d/%2$d개 열었어요</string>
+    <string name="walk_map_nearest">가장 가까운 상자까지 %,dm</string>
+    <string name="walk_map_all_opened">오늘 열 수 있는 보물상자를 모두 열었어요! 내일 또 만나요</string>
+    <string name="walk_map_locating">내 위치를 찾고 있어요</string>
+    <string name="walk_map_open">상자 열기 (+%dP)</string>
+    <string name="walk_map_open_hint">%dm 안으로 들어가면 열 수 있어요</string>
+    <string name="walk_map_permission_title">보물상자를 찾으려면 위치가 필요해요</string>
+    <string name="walk_map_permission_description">이 화면이 열려 있을 때만 위치를 사용해요.</string>
+    <string name="walk_map_permission_request">위치 권한 허용하기</string>
+    <string name="walk_map_precise_required">정확한 위치를 허용해야 상자를 열 수 있어요</string>
+    <string name="walk_map_open_settings">설정에서 변경하기</string>
+    <string name="walk_map_load_failed">보물상자를 불러오지 못했어요</string>
+
     <string name="wallet_balance">%,dP</string>
     <string name="wallet_balance_label">내 포인트</string>
     <string name="wallet_history">적립 내역</string>
     <string name="wallet_empty">아직 적립 내역이 없어요</string>
     <string name="wallet_reason_reward_tier">%,d보 리워드</string>
+    <string name="wallet_reason_treasure">보물상자</string>
     <string name="wallet_reason_other">적립</string>
     <string name="wallet_amount">+%dP</string>
     <string name="wallet_date_time">%1$d월 %2$d일 %3$02d:%4$02d</string>

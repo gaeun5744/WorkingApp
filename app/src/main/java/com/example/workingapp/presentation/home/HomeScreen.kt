@@ -34,6 +34,7 @@ import com.example.workingapp.presentation.home.components.RewardTiersCard
 import com.example.workingapp.presentation.home.components.StepProgressRing
 import com.example.workingapp.presentation.nav.HistoryKey
 import com.example.workingapp.presentation.nav.RankingKey
+import com.example.workingapp.presentation.nav.WalkMapKey
 import com.example.workingapp.presentation.nav.WalletKey
 import com.example.workingapp.ui.theme.WorkingAppTheme
 import kotlinx.collections.immutable.persistentListOf
@@ -160,6 +161,7 @@ private fun Message(title: String, description: String) {
 private fun TemporaryNavigation(onEvent: (HomeEvent) -> Unit) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         listOf(
+            R.string.screen_walk_map to WalkMapKey,
             R.string.screen_history to HistoryKey,
             R.string.screen_ranking to RankingKey,
             R.string.screen_wallet to WalletKey,

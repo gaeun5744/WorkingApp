@@ -3,6 +3,7 @@ package com.example.workingapp.presentation.wallet
 import com.example.workingapp.R
 import com.example.workingapp.domain.model.AppError
 import com.example.workingapp.domain.model.Wallet
+import com.example.workingapp.domain.model.WalletReason
 import com.example.workingapp.domain.model.WalletTransaction
 import com.example.workingapp.presentation.text.UiText
 import com.example.workingapp.testing.FakeRewardRepository
@@ -21,7 +22,7 @@ class WalletViewModelTest {
 
     @Test
     fun `잔액과 적립 내역을 보여준다`() {
-        val transaction = WalletTransaction("t_1", 5, rewardTier = 3, createdAt = OffsetDateTime.parse("2026-10-25T21:30:00+09:00"))
+        val transaction = WalletTransaction("t_1", 5, WalletReason.RewardTier(3), createdAt = OffsetDateTime.parse("2026-10-25T21:30:00+09:00"))
         repository.walletResult = Result.success(Wallet(balance = 5, transactions = listOf(transaction)))
 
         val state = WalletViewModel(repository).uiState.value as WalletUiState.Content

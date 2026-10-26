@@ -15,9 +15,16 @@ import com.example.workingapp.data.remote.dto.StepsSyncResponse
 import com.example.workingapp.data.remote.dto.StepsSyncResultDto
 import com.example.workingapp.data.remote.dto.SyncStatusDto
 import com.example.workingapp.data.remote.dto.TokenResponse
+import com.example.workingapp.data.remote.dto.TreasureDto
+import com.example.workingapp.data.remote.dto.TreasureOpenRequest
+import com.example.workingapp.data.remote.dto.TreasureOpenResponse
+import com.example.workingapp.data.remote.dto.TreasuresNearbyResponse
 import com.example.workingapp.data.remote.dto.WalletResponse
 import com.example.workingapp.data.remote.dto.WalletTransactionDto
+import com.example.workingapp.domain.geo.distanceMetersTo
+import com.example.workingapp.domain.model.GeoPoint
 import java.time.Clock
+import java.time.Duration
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
@@ -41,6 +48,7 @@ internal class MockServer @Inject constructor(
     private val clock: Clock,
     private val config: MockApiConfig,
     private val neighborSteps: MockNeighborSteps,
+    private val treasureField: MockTreasureField,
 ) {
     private val lock = Any()
 
@@ -51,6 +59,8 @@ internal class MockServer @Inject constructor(
     private val claimedTiers = mutableSetOf<Claim>()
     private val balances = mutableMapOf<String, Int>()
     private val transactions = mutableMapOf<String, MutableList<WalletTransactionDto>>()
+    private val openedTreasures = mutableSetOf<Pair<String, String>>()
+    private val lastOpen = mutableMapOf<String, Pair<GeoPoint, Instant>>()
     private var nextId = 1L
 
     // region 인증
@@ -201,17 +211,7 @@ internal class MockServer @Inject constructor(
                 return MockResult.Failure(400, "REWARD_NOT_REACHED", "아직 구간 걸음 수에 도달하지 않았습니다.")
             }
             claimedTiers += claim
-            balances[userId] = balanceOf(userId) + tier.points
-            transactions.getOrPut(userId) { mutableListOf() }.add(
-                0,
-                WalletTransactionDto(
-                    id = "t_${nextId++}",
-                    amount = tier.points,
-                    reason = "REWARD_TIER_${tier.tier}",
-                    createdAt = OffsetDateTime.now(clock).truncatedTo(ChronoUnit.SECONDS)
-                        .format(DateTimeFormatter.ISO_OFFSET_DATE_TIME),
-                ),
-            )
+            credit(userId, tier.points, reason = "REWARD_TIER_${tier.tier}")
             MockResult.Success(
                 RewardClaimResponse(request.date, tier.tier, tier.points, balanceOf(userId), alreadyClaimed = false),
             )
@@ -222,6 +222,93 @@ internal class MockServer @Inject constructor(
     }
 
     private fun balanceOf(userId: String): Int = balances[userId] ?: 0
+
+    private fun credit(userId: String, amount: Int, reason: String) {
+        balances[userId] = balanceOf(userId) + amount
+        transactions.getOrPut(userId) { mutableListOf() }.add(
+            0,
+            WalletTransactionDto(
+                id = "t_${nextId++}",
+                amount = amount,
+                reason = reason,
+                createdAt = OffsetDateTime.now(clock).truncatedTo(ChronoUnit.SECONDS)
+                    .format(DateTimeFormatter.ISO_OFFSET_DATE_TIME),
+            ),
+        )
+    }
+
+    // endregion
+
+    // region 보물상자
+
+    fun getNearbyTreasures(userId: String, latitude: Double?, longitude: Double?): MockResult<TreasuresNearbyResponse> =
+        synchronized(lock) {
+            if (latitude == null || longitude == null || latitude !in -90.0..90.0 || longitude !in -180.0..180.0) {
+                return validationError("latitude, longitude 가 필요합니다.")
+            }
+            val today = LocalDate.now(clock)
+            val treasures = treasureField.treasuresAround(GeoPoint(latitude, longitude), today).map { spot ->
+                TreasureDto(
+                    id = spot.id,
+                    latitude = spot.point.latitude,
+                    longitude = spot.point.longitude,
+                    points = TREASURE_POINTS,
+                    opened = (userId to spot.id) in openedTreasures,
+                )
+            }
+            MockResult.Success(
+                TreasuresNearbyResponse(
+                    date = today.toString(),
+                    openRadiusMeters = OPEN_RADIUS_METERS,
+                    dailyOpenLimit = DAILY_OPEN_LIMIT,
+                    openedToday = openedCountOn(userId, today),
+                    treasures = treasures,
+                ),
+            )
+        }
+
+    /** 검증 순서는 docs/api.md 와 같다. 이동 속도는 조작할 수 없는 서버 시각으로 계산한다. */
+    fun openTreasure(userId: String, treasureId: String, request: TreasureOpenRequest): MockResult<TreasureOpenResponse> =
+        synchronized(lock) {
+            val found = treasureField.find(treasureId)
+                ?: return MockResult.Failure(404, "NOT_FOUND", "존재하지 않는 보물상자입니다.")
+            val today = LocalDate.now(clock)
+            if (found.date != today) return treasureFailure("TREASURE_NOT_TODAY", "오늘의 보물상자가 아닙니다.")
+            if ((userId to treasureId) in openedTreasures) {
+                return MockResult.Success(TreasureOpenResponse(treasureId, TREASURE_POINTS, balanceOf(userId), alreadyOpened = true))
+            }
+            if (openedCountOn(userId, today) >= DAILY_OPEN_LIMIT) {
+                return treasureFailure("TREASURE_DAILY_LIMIT", "오늘 열 수 있는 보물상자를 모두 열었습니다.")
+            }
+            if (request.isMock) return treasureFailure("TREASURE_MOCK_LOCATION", "가짜 위치로는 열 수 없습니다.")
+            if (request.accuracyMeters > MAX_ACCURACY_METERS) return treasureFailure("TREASURE_LOW_ACCURACY", "위치 정확도가 낮습니다.")
+            val position = GeoPoint(request.latitude, request.longitude)
+            if (position.distanceMetersTo(found.spot.point) > OPEN_RADIUS_METERS) {
+                return treasureFailure("TREASURE_TOO_FAR", "보물상자에서 너무 멉니다.")
+            }
+            val now = clock.instant()
+            lastOpen[userId]?.let { (previousPoint, previousAt) ->
+                val seconds = Duration.between(previousAt, now).seconds.coerceAtLeast(1)
+                val kmPerHour = previousPoint.distanceMetersTo(position) / seconds * SECONDS_PER_HOUR / METERS_PER_KM
+                if (kmPerHour > MAX_SPEED_KMH) return treasureFailure("TREASURE_TOO_FAST", "이동 속도가 비정상적입니다.")
+            }
+            openedTreasures += userId to treasureId
+            lastOpen[userId] = position to now
+            credit(userId, TREASURE_POINTS, reason = "TREASURE")
+            MockResult.Success(TreasureOpenResponse(treasureId, TREASURE_POINTS, balanceOf(userId), alreadyOpened = false))
+        }
+
+    // 상자 id 에 날짜(yyyyMMdd)가 들어 있어 오늘 연 개수를 따로 저장하지 않고 센다
+    private fun openedCountOn(userId: String, date: LocalDate): Int {
+        val marker = "-${date.format(DateTimeFormatter.BASIC_ISO_DATE)}-"
+        return openedTreasures.count { (owner, id) -> owner == userId && marker in id }
+    }
+
+    private fun regionOf(userId: String): RegionDto? = REGIONS.find { it.id == users.getValue(userId).regionId }
+
+    private fun regionNotSet() = MockResult.Failure(409, "REGION_NOT_SET", "동네를 먼저 설정해 주세요.")
+
+    private fun treasureFailure(code: String, message: String) = MockResult.Failure(400, code, message)
 
     // endregion
 
@@ -235,9 +322,7 @@ internal class MockServer @Inject constructor(
             PERIOD_WEEKLY -> today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
             else -> return validationError("period 는 daily 또는 weekly 입니다.")
         }
-        val me = users.getValue(userId)
-        val region = REGIONS.find { it.id == me.regionId }
-            ?: return MockResult.Failure(409, "REGION_NOT_SET", "동네를 먼저 설정해 주세요.")
+        val region = regionOf(userId) ?: return regionNotSet()
 
         val days = generateSequence(periodStart) { it.plusDays(1) }.takeWhile { !it.isAfter(today) }.toList()
         val realUsers = users.values.filter { it.regionId == region.id }
@@ -286,6 +371,13 @@ internal class MockServer @Inject constructor(
         const val RANKING_SIZE = 50
         const val PERIOD_DAILY = "daily"
         const val PERIOD_WEEKLY = "weekly"
+        const val TREASURE_POINTS = 2
+        const val OPEN_RADIUS_METERS = 50
+        const val DAILY_OPEN_LIMIT = 5
+        const val MAX_ACCURACY_METERS = 50.0
+        const val MAX_SPEED_KMH = 20.0
+        const val SECONDS_PER_HOUR = 3_600.0
+        const val METERS_PER_KM = 1_000.0
 
         val REWARD_TIERS = listOf(
             RewardTier(1, 1_000, 1),
@@ -301,5 +393,6 @@ internal class MockServer @Inject constructor(
             RegionDto(7, "연남동"), RegionDto(8, "성수동"), RegionDto(9, "망원동"),
             RegionDto(10, "판교동"),
         )
+
     }
 }

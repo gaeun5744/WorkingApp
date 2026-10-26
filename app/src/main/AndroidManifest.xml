@@ -12,6 +12,10 @@
     <!-- 재부팅 후 측정 재시작 -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
+    <!-- 동네걷기 지도: 화면이 보일 때만 위치 사용 (백그라운드 위치 없음, PRD Q20) -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
     <uses-feature
         android:name="android.hardware.sensor.stepcounter"
         android:required="false" />
@@ -38,6 +42,11 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- 네이버 지도 Client ID: local.properties 의 NAVER_MAP_CLIENT_ID 를 빌드 시 주입 -->
+        <meta-data
+            android:name="com.naver.maps.map.NCP_KEY_ID"
+            android:value="${NAVER_MAP_CLIENT_ID}" />
 
         <service
             android:name=".service.StepCounterService"
