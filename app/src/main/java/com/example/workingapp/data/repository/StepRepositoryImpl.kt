@@ -1,6 +1,7 @@
 package com.example.workingapp.data.repository
 
 import androidx.room.withTransaction
+import com.example.workingapp.data.local.GoalStore
 import com.example.workingapp.data.local.WorkingAppDatabase
 import com.example.workingapp.data.local.entity.DailyStepsEntity
 import com.example.workingapp.data.local.entity.HourlyStepsEntity
@@ -13,6 +14,7 @@ import com.example.workingapp.data.remote.dto.HourlyStepsDto
 import com.example.workingapp.data.remote.dto.StepsSyncRequest
 import com.example.workingapp.data.sensor.StepDataSource
 import com.example.workingapp.domain.model.DailySteps
+import com.example.workingapp.domain.model.HourlySteps
 import com.example.workingapp.domain.model.StepReading
 import com.example.workingapp.domain.repository.StepRepository
 import com.example.workingapp.domain.step.StepDelta
@@ -20,6 +22,7 @@ import com.example.workingapp.domain.step.StepDeltaCalculator
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
@@ -37,6 +40,7 @@ internal class StepRepositoryImpl @Inject constructor(
     private val clock: Clock,
     private val api: PedometerApi,
     private val json: Json,
+    private val goalStore: GoalStore,
 ) : StepRepository {
 
     private val dao = database.stepDao()
@@ -64,17 +68,28 @@ internal class StepRepositoryImpl @Inject constructor(
                 steps = (daily?.steps ?: 0) + delta.steps,
                 updatedAtMillis = clock.millis(),
                 synced = false,
+                // 그날 첫 기록일 때의 목표를 남긴다. 이후 목표 변경은 GoalRepository 가 오늘 행에 반영한다
+                goal = daily?.goal ?: goalStore.current(),
             ),
         )
         val hourly = dao.getHourly(date, delta.hour)
         dao.upsertHourly(HourlyStepsEntity(date, delta.hour, (hourly?.steps ?: 0) + delta.steps))
     }
 
+    // 오늘은 아직 기록이 없을 수 있어 목표는 항상 현재 목표를 쓴다
     @OptIn(ExperimentalCoroutinesApi::class)
     override fun observeTodaySteps(): Flow<DailySteps> =
         todayFlow().flatMapLatest { today ->
-            dao.observeDaily(today.toString()).map { it?.toDomain() ?: DailySteps(today, steps = 0) }
+            combine(dao.observeDaily(today.toString()), goalStore.goal) { entity, goal ->
+                DailySteps(today, steps = entity?.steps ?: 0, goal = goal)
+            }
         }
+
+    override fun observeDailySteps(from: LocalDate, to: LocalDate): Flow<List<DailySteps>> =
+        dao.observeRange(from.toString(), to.toString()).map { rows -> rows.map { it.toDomain() } }
+
+    override fun observeHourlySteps(date: LocalDate): Flow<List<HourlySteps>> =
+        dao.observeHourlyOf(date.toString()).map { rows -> rows.map { it.toDomain() } }
 
     // 다음 자정까지 기다렸다가 새 날짜를 내보낸다
     private fun todayFlow(): Flow<LocalDate> = flow {

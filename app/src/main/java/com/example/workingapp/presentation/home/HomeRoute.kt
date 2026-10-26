@@ -55,6 +55,7 @@ fun HomeRoute(
                 HomeEvent.OpenSettings -> context.startActivity(
                     Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null)),
                 )
+                is HomeEvent.ChangeGoal -> viewModel.onGoalChange(event.goal)
                 is HomeEvent.Navigate -> onNavigate(event.key)
             }
         },

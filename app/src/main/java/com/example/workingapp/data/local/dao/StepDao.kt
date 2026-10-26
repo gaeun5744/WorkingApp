@@ -17,6 +17,17 @@ interface StepDao {
     @Query("SELECT * FROM daily_steps WHERE date = :date")
     suspend fun getDaily(date: String): DailyStepsEntity?
 
+    /** 기록 화면용: [fromDate]~[toDate] (양 끝 포함) */
+    @Query("SELECT * FROM daily_steps WHERE date BETWEEN :fromDate AND :toDate ORDER BY date")
+    fun observeRange(fromDate: String, toDate: String): Flow<List<DailyStepsEntity>>
+
+    @Query("SELECT * FROM hourly_steps WHERE date = :date ORDER BY hour")
+    fun observeHourlyOf(date: String): Flow<List<HourlyStepsEntity>>
+
+    /** 목표를 바꾸면 오늘 행의 목표만 바꾼다 (지난날은 그날의 목표 유지) */
+    @Query("UPDATE daily_steps SET goal = :goal WHERE date = :date")
+    suspend fun updateGoal(date: String, goal: Int)
+
     @Query("SELECT * FROM hourly_steps WHERE date = :date AND hour = :hour")
     suspend fun getHourly(date: String, hour: Int): HourlyStepsEntity?
 

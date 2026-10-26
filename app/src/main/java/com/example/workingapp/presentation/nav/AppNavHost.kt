@@ -12,6 +12,7 @@ import androidx.navigation3.runtime.result.LocalResultEventBus
 import androidx.navigation3.runtime.result.rememberResultEventBusNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
 import com.example.workingapp.R
+import com.example.workingapp.presentation.history.HistoryRoute
 import com.example.workingapp.presentation.home.HomeRoute
 import com.example.workingapp.presentation.onboarding.OnboardingRoute
 import com.example.workingapp.presentation.placeholder.PlaceholderScreen
@@ -54,7 +55,7 @@ fun AppNavHost(
                 )
             }
             entry<HomeKey> { HomeRoute(onNavigate = navigate) }
-            entry<HistoryKey> { PlaceholderScreen(title = stringResource(R.string.screen_history)) }
+            entry<HistoryKey> { HistoryRoute() }
             entry<RankingKey> { PlaceholderScreen(title = stringResource(R.string.screen_ranking)) }
             entry<WalletKey> { PlaceholderScreen(title = stringResource(R.string.screen_wallet)) }
         },
