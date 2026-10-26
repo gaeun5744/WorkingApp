@@ -38,13 +38,13 @@
 | `presentation/home` | 홈: 목표 진행 링(`StepProgressRing`), 환산값, 목표 변경(`GoalDialog`), 권한·센서 미지원 상태 | M4 ✅ |
 | `presentation/home/components/RewardTiersCard` | 리워드 구간 버튼 (잠김/받기/받음) | M5 ✅ |
 | `presentation/wallet` | 지갑: 잔액 + 적립 내역 (리워드 구간 / 보물상자 / 기타) | M6 ✅ |
+| `presentation/ranking` | 동네 랭킹: 일간/주간, 내 순위 고정, 상위 50, 당겨서 새로고침, 동네 변경 | M7 ✅ |
 | `presentation/walkmap` | 동네걷기 지도: 네이버 지도(`NaverMapView`), 보물상자 열기, 위치 권한 상태 | M6 ✅ |
 | `data/location` | `FusedLocationRepository` (구독 중에만 위치 요청) | M6 ✅ |
 | `domain/geo` | 하버사인 거리, 미터 단위 좌표 이동 | M6 ✅ |
 | `presentation/history` | 기록: 일/주/월 탭, 기간 이동, 합계·평균·달성 일수, Canvas 막대 그래프(`StepBarChart`) | M4 ✅ |
 | `presentation/nav` | `NavKeys.kt`, `AppNavHost.kt` (Navigation 3) | M1 ✅ |
 | `presentation/text` | `UiText` + `asString()` (i18n-safe 메시지) | M1 ✅ |
-| `presentation/placeholder` | 화면 골격용 임시 화면 — 실제 화면이 생기면 삭제 | M1 (임시) |
 | `service` | `StepCounterService`(FGS type=health), `BootCompletedReceiver`, `StepNotificationFactory` | M2 ✅ |
 | `worker` | `StepSnapshotWorker` (15분 주기), `StepSyncWorker` (15분 주기 + 앱 시작·온보딩 완료 시, 네트워크 조건, 지수 백오프) | M3 ✅ |
 
@@ -237,7 +237,39 @@ Mock: MockTreasureField((칸, 날짜) 시드 → 칸마다 2개, id = 칸_날짜
   - 격자 방식(Q25)에서: 동네를 역삼동으로 설정하고 **부산 해운대**에서 지도를 열자 해운대 주변 상자 표시(가장 가까운 126m) → 상자 7m 옆에서 열기 성공(1/5) → 칸 경계를 넘을 때마다 `/treasures/nearby` 재조회
   - 확인 못 함: 같은 칸 안 이동 시 재조회하지 않는 것(단위 테스트로만 검증), 가짜 GPS 거부(`geo fix`는 모의 위치로 표시되지 않음)
 
-## 8. Mock 서버 (Phase A)
+## 8. 동네 랭킹 (M7)
+
+```
+RankingRoute ── ResultEffect<RegionResult> (동네 변경 결과), Snackbar
+   └ RankingViewModel ── 기간 전환·새로고침 시 이전 요청 취소(loadJob)
+        └ RankingRepository (@Singleton, Mutex)
+             캐시가 5분 안이면 그대로 → 아니면 StepRepository.syncPendingSteps() → GET /ranking → 기간별 캐시
+             동네 변경 시 invalidate()
+```
+
+### 설계 결정 (선택하지 않은 대안 포함)
+
+| 결정 | 선택 | 선택하지 않은 대안 → 이유 |
+|---|---|---|
+| 캐시 위치 | **메모리, 기간별, 5분** (PRD §6) | Room 저장: 랭킹은 금방 바뀌고 앱을 다시 열면 새로 받는 게 맞아 영속화 이점이 작다. 캐시 없음: 탭 전환·재진입마다 요청이 나간다. |
+| 내 순위 정확도 | **새로 받을 때 내 미동기화 걸음을 먼저 업로드** (실패해도 랭킹은 표시) | 그냥 조회: 서버 걸음이 최대 15분 늦어 내 순위가 실제보다 낮게 보인다. |
+| 동시 요청 | **Repository `Mutex`로 같은 요청을 직렬화** | 보호 없음: 화면 진입과 새로고침이 겹치면 같은 요청·동기화가 두 번 나간다. |
+| 늦게 도착한 응답 | **ViewModel 에서 이전 요청 Job 취소** | 그대로 반영: 탭을 빠르게 바꾸면 이전 기간 응답이 현재 탭을 덮는다. |
+| 새로고침 실패 | **기존 목록 유지 + Snackbar**, 처음 실패만 오류 화면 | 항상 오류 화면: 일시적 실패로 보던 목록이 사라진다. |
+| 내 순위 표시 | **목록 밖 고정 카드 + 목록 안 내 행 강조** | 목록 안에서만 표시: 50위 밖이거나 스크롤하면 내 순위가 안 보인다. |
+| 동네 변경 위치 | **랭킹 화면에서 변경** (동네는 랭킹 전용, PRD Q25), 기존 동네 선택 화면을 `ResultEventBus`로 재사용 | 별도 설정 화면: 동네를 쓰는 곳이 랭킹뿐이라 동선이 길어진다. |
+
+### 해결하지 못한 문제: "NavDisplay backstack cannot be empty" 크래시 (1회)
+- 상황: 에뮬레이터에서 온보딩 → 랭킹 → 일간/주간 전환 → 동네 변경 → 성수동 선택 직후 1회 크래시.
+- 조사: 같은 순서, 같은 프로세스 온보딩 직후, 데이터 삭제 후, 새 설치 + 뒤로가기 등 4가지 조건으로 재현을 시도했으나 모두 정상. 스택에는 백스택이 비었다는 결과만 남아 원인 지점을 특정하지 못했고, 최초 크래시 직전 로그는 재현 과정에서 지워졌다. 백스택이 하나뿐일 때 뒤로가기는 NavDisplay 가 처리하지 않고 액티비티가 종료된다(크래시 아님)는 것은 확인했다.
+- 조치(증상 차단): 백스택에서 빼는 두 곳(`onBack`, 동네 선택 결과)을 `pop()`으로 모아 마지막 화면은 빼지 않게 하고, 시도가 있으면 `Timber.w`로 호출 위치와 백스택을 기록한다. 다시 발생하면 이 로그로 원인을 추적한다.
+
+### 검증
+- 단위 테스트: `RankingRepositoryImplTest` 6 (Mock 경로 실제 요청 횟수로 5분 캐시·만료·강제 새로고침·기간별 분리·동네 변경 무효화·실패 미캐시 확인), `RankingViewModelTest` 6
+- 린트로 발견해 수정: `LocalTime.ofInstant`는 API 31+ 라 minSdk 30(Android 11) 기기에서 랭킹 화면이 크래시 → `atZone().toLocalTime()`
+- 에뮬레이터: 랭킹 진입 시 `steps/sync → ranking?period=daily` 순서, 내 순위 고정 카드·"HH:mm 기준", 이번 주 탭 → 오늘 복귀 시 캐시 사용(재요청 없음), 동네 변경(역삼동 → 성수동) 후 "성수동 랭킹" 표시
+
+## 9. Mock 서버 (Phase A)
 
 ```
 PedometerApi(Retrofit) → OkHttpClient
@@ -265,13 +297,13 @@ PedometerApi(Retrofit) → OkHttpClient
 2. `AndroidManifest.xml`에 `INTERNET` 권한 추가 (Mock은 실제 네트워크를 쓰지 않아 지금은 없음)
 3. `docs/api.md` 기준으로 Mock과 서버 응답 차이 점검
 
-## 9. 빌드 메모
+## 10. 빌드 메모
 
 - AGP 9 내장 Kotlin + KSP 2.0.x 조합 때문에 `gradle.properties`에 `android.disallowKotlinSourceSets=false`가 필요하다 (실험적 옵션 경고가 뜨는 것은 정상). KSP가 `android.sourceSets` 방식을 지원하면 제거한다.
 - Hilt 2.60 생성 코드가 `@CanIgnoreReturnValue`를 참조해 `error_prone_annotations`를 `compileOnly`로 추가했다.
 - Navigation 3의 `ResultEventBus`는 1.2.0-alpha 라인에만 있어 alpha 버전을 쓴다.
 - Room 스키마는 `app/schemas/`에 내보낸다 (마이그레이션 테스트용, 커밋 대상).
 - KDoc·블록 주석 안에 `/*` 를 쓰지 않는다 (예: `/auth/*`). Kotlin 블록 주석은 중첩되어 주석이 닫히지 않고 뒤의 클래스 전체가 사라진다 — KSP가 "could not be resolved"로만 알려 준다.
-- 16KB 페이지 호환성: 모든 `.so`의 LOAD 세그먼트는 16KB 정렬이지만, `libdatastore_shared_counter.so`(datastore 1.2.0)와 `libandroidx.graphics.path.so`(Compose)의 **GNU_RELRO 끝이 4KB 단위**라 API 37 에뮬레이터에서 호환 모드 경고가 뜬다. `libnavermap.so`(3.24.0)는 RELRO까지 16KB 정렬. 앱은 동작하지만 후속 처리 필요 (TODO 공통 항목).
+- 16KB 페이지 호환성: 모든 `.so`의 LOAD 세그먼트는 16KB 정렬이지만, `libdatastore_shared_counter.so`(datastore 1.2.0)와 `libandroidx.graphics.path.so`(Compose)의 **GNU_RELRO 끝이 4KB 단위**라 API 37 에뮬레이터에서 호환 모드 경고가 뜬다. `libnavermap.so`(3.24.0)는 ELF 헤더상 RELRO까지 16KB 정렬이지만, API 37 호환성 대화상자는 이 라이브러리도 "Unknown error"로 표시한다(원인 미확인). 앱은 동작하지만 후속 처리 필요 (TODO 공통 항목).
 - `connectedDebugAndroidTest`는 테스트가 끝나면 대상 기기의 앱을 **삭제**한다. 기기 데이터로 업그레이드를 확인하려면 계측 테스트 전에 한다.
 - `connectedDebugAndroidTest`는 연결된 **모든 기기**에서 실행된다. 에뮬레이터만 쓰려면 `ANDROID_SERIAL=emulator-5554`를 지정한다.
