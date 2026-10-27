@@ -304,6 +304,9 @@ PedometerApi(Retrofit) → OkHttpClient
 - Navigation 3의 `ResultEventBus`는 1.2.0-alpha 라인에만 있어 alpha 버전을 쓴다.
 - Room 스키마는 `app/schemas/`에 내보낸다 (마이그레이션 테스트용, 커밋 대상).
 - KDoc·블록 주석 안에 `/*` 를 쓰지 않는다 (예: `/auth/*`). Kotlin 블록 주석은 중첩되어 주석이 닫히지 않고 뒤의 클래스 전체가 사라진다 — KSP가 "could not be resolved"로만 알려 준다.
-- 16KB 페이지 호환성: 모든 `.so`의 LOAD 세그먼트는 16KB 정렬이지만, `libdatastore_shared_counter.so`(datastore 1.2.0)와 `libandroidx.graphics.path.so`(Compose)의 **GNU_RELRO 끝이 4KB 단위**라 API 37 에뮬레이터에서 호환 모드 경고가 뜬다. `libnavermap.so`(3.24.0)는 ELF 헤더상 RELRO까지 16KB 정렬이지만, API 37 호환성 대화상자는 이 라이브러리도 "Unknown error"로 표시한다(원인 미확인). 앱은 동작하지만 후속 처리 필요 (TODO 공통 항목).
+- 16KB 페이지 호환성 (해결, `fix/16kb-page-size`): API 37 에뮬레이터의 "RELRO alignment check failed" 경고 원인은 `libdatastore_shared_counter.so`(DataStore **1.2.0**)의 GNU_RELRO 끝이 `0xd000`(16KB 미정렬)이었던 것. DataStore **1.2.1**에서 `0xc000`으로 정렬되어 경고가 사라졌다 (같은 절차로 1.2.0 대조군은 경고, 1.2.1은 경고 없음).
+  - 확인 방법: `zipalign -c -P 16 -v 4 <apk>`(zip 정렬, 모두 통과)와 APK 안 `.so`의 ELF `PT_GNU_RELRO` 끝(vaddr + memsz) % 0x4000 검사.
+  - 남은 것: `libandroidx.graphics.path.so`(Compose `graphics-path` 1.0.1)도 공식 문서 기준으로는 RELRO 끝이 `0x6000`으로 미정렬이지만 에뮬레이터 검사는 통과한다. 최신 1.1.0도 같은 값이라 업그레이드로는 바뀌지 않는다. Play Console 16KB 검사 결과는 아직 확인 못 함 (Play 업로드는 M9).
+  - `libnavermap.so`(3.24.0)는 LOAD·RELRO 모두 16KB 정렬.
 - `connectedDebugAndroidTest`는 테스트가 끝나면 대상 기기의 앱을 **삭제**한다. 기기 데이터로 업그레이드를 확인하려면 계측 테스트 전에 한다.
 - `connectedDebugAndroidTest`는 연결된 **모든 기기**에서 실행된다. 에뮬레이터만 쓰려면 `ANDROID_SERIAL=emulator-5554`를 지정한다.

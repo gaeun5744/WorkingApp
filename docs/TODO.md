@@ -300,7 +300,8 @@ worker               WorkManager Worker                     ← 지침 확장
 - 서버 (Phase B)
   - `server/`에서 `./gradlew test` (Testcontainers로 PostgreSQL·Redis 통합 테스트)
 - 배터리 사용량 측정 (Android Studio Energy Profiler)
-- 16KB 페이지 호환성: `datastore-preferences` 네이티브 라이브러리 정렬 문제 확인·대응 (새 버전 확인 또는 대체), Compose graphics 라이브러리 포함 (`docs/architecture.md` 빌드 메모)
+- [x] 16KB 페이지 호환성: DataStore 1.2.0 → 1.2.1 (RELRO 정렬)로 에뮬레이터 경고 해결 (`docs/architecture.md` 빌드 메모)
+- [ ] 16KB: Compose `graphics-path`의 RELRO 미정렬(에뮬레이터는 통과) — Play Console 업로드 시(M9) 검사 결과 확인, 필요하면 대응
 
 ---
 
