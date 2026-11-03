@@ -86,33 +86,33 @@ Phase A(앱 + Mock 서버)로 이미 구현된 부분이 많으므로, 새 기�
   4. 네트워크 복구 → `StepSyncWorker`가 재시도해 `synced = true`가 되는지 확인
   5. 같은 날짜를 다시 보내도 Mock 값이 그대로인지(`max` 멱등) 확인
 - [x] 결과를 `docs/week2/scenarios.md`에 기록 (로그와 DB 상태 포함)
-- [ ] 실패하거나 예상과 다르게 동작하면 `fix/*` 브랜치로 따로 수정
+- [x] 실패하거나 예상과 다르게 동작하면 `fix/*` 브랜치로 따로 수정 — 오프라인 시나리오는 예상대로 동작. 별도로 발견한 실기기 측정 공백 버그는 `fix/step-gap-spread`로 수정
 
-### Task 3. 2주차 설계 문서 `docs/week2/system-architecture.md` ★ 발표 자료
+### Task 3. 2주차 설계 문서 `docs/week2/system-architecture.md` ★ 발표 자료 ✅
 
-- [ ] **전체 아키텍처 다이어그램 1개**
+- [x] **전체 아키텍처 다이어그램 1개**
   - Android: STEP_COUNTER → `StepCounterService` → `StepRepository` → Room / Compose UI, `StepSyncWorker`
   - → HTTPS(Caddy) → API Server(인증 / 걸음 처리 / 리워드 처리 / 보물상자 / 랭킹) → PostgreSQL
   - Phase A의 Mock 위치(`MockApiInterceptor`)도 표시
-- [ ] **구성 요소별 역할**: 구성 요소마다 "역할 / 왜 필요한가 / 없으면 어떤 문제가 생기는가"
-- [ ] **핵심 개념 5가지 질문에 이 프로젝트 기준으로 답하기**
+- [x] **구성 요소별 역할**: 구성 요소마다 "역할 / 왜 필요한가 / 없으면 어떤 문제가 생기는가"
+- [x] **핵심 개념 5가지 질문에 이 프로젝트 기준으로 답하기**
   - Client-Server: 걸음 수를 왜 서버에 저장하나 → 역할 분리(PRD Q5), 리워드·랭킹·기기 변경
   - REST API: 걸음 수를 어떤 API로 보내나 → `POST /steps/sync` 배치 + 멱등 `max`
   - API Server: 1만 보 달성 여부는 어디서 판단하나 → 서버가 자기가 받은 값으로 판정, 앱 판정은 버튼 표시용
   - Database: 서버가 재시작되면 데이터는 → PostgreSQL이 원천, 캐시는 다시 만들 수 있음
   - 확장성: 서버 한 대가 부족하면 → 위 트래픽 계산과 확장 단계
-- [ ] **걸음 저장·조회 API 2개**: `POST /steps/sync`, `GET /steps` 요약 (상세는 `docs/week2/api.md`)
-- [ ] **시나리오 3가지** (실제 클래스 이름으로 순서 정리)
+- [x] **걸음 저장·조회 API 2개**: `POST /steps/sync`, `GET /steps` 요약 (상세는 `docs/week2/api.md`)
+- [x] **시나리오 3가지** (실제 클래스 이름으로 순서 정리)
   - A. 100걸음을 걸었다: 센서 → 증분 계산 → Room → Flow → UI. 매번 서버를 부르지 않는 이유(화면 표시용 데이터와 서버 저장용 데이터 구분, 배터리, WorkManager 최소 15분)
   - B. 인터넷이 끊겼다가 복구됐다: `synced` 플래그 → WorkManager 네트워크 조건 + 지수 백오프 → 멱등 upsert (Task 2 결과 인용)
   - C. 1만 보를 달성했다: 수령 직전 동기화 → `POST /rewards/claim` → 서버 판정 → `UNIQUE(user, date, tier)`로 중복 지급 방지 → 지갑 갱신
-- [ ] **내 설계의 약점 2가지** (후보 중 선택하고 보완 방법 적기)
+- [x] **내 설계의 약점 2가지** (후보 중 선택하고 보완 방법 적기)
   1. 최대 15분 동기화 지연으로 랭킹이 늦게 반영됨 (리워드는 수령 직전 동기화로 보완)
   2. 걸음 값은 결국 클라이언트가 보낸 값을 믿음. 상한과 Play Integrity로도 폰 흔들기는 못 막음
   3. VM 1대가 단일 장애 지점(SPOF)
   4. 재설치 시 기록이 사라짐 (Task 1로 해결했는지에 따라)
-- [ ] **기술 선택표**: 기술마다 "왜 썼는가 / 없으면 어떤 문제가 생기는가" (Room, WorkManager, Foreground Service, Retrofit, PostgreSQL, Caddy, JWT, Play Integrity, Redis(보류))
-- [ ] 가이드 참고 내용 반영: Health Connect / Recording API(Android 13 이하)를 걸음 소스로 쓰지 않은 이유 (1주차 PRD Q8 + Recording API 대안 추가)
+- [x] **기술 선택표**: 기술마다 "왜 썼는가 / 없으면 어떤 문제가 생기는가" (Room, WorkManager, Foreground Service, Retrofit, PostgreSQL, Caddy, JWT, Play Integrity, Redis(보류))
+- [x] 가이드 참고 내용 반영: Health Connect / Recording API(Android 13 이하)를 걸음 소스로 쓰지 않은 이유 (1주차 PRD Q8 + Recording API 대안 추가)
 
 ### 버그 수정: 측정 공백 걸음이 한 시간에 몰림 (실기기 SM-S916N, 2026-11-03) ✅
 
@@ -124,14 +124,14 @@ Phase A(앱 + Mock 서버)로 이미 구현된 부분이 많으므로, 새 기�
 - 커밋은 `fix/step-gap-spread` 브랜치로 분리 (버그 수정은 `fix/*` 규칙)
 - Task 3 "약점"에 실제 사례로 사용: 클라이언트 측정 공백 → 서버에 잘못된 데이터
 
-### Task 4. 1주차 계획 수정 사항 반영
+### Task 4. 1주차 계획 수정 사항 반영 ✅
 
-- [ ] `docs/week1/TODO.md`를 `docs/week2/TODO.md`로 복사해 이후 기준으로 삼기
+- [x] `docs/week1/TODO.md`를 `docs/week2/TODO.md`로 복사해 이후 기준으로 삼기
   - M8: docker-compose에서 Redis 제외, PostgreSQL 기반 랭킹 준비
   - M10: "DB 랭킹 구현 → 부하 테스트로 한계 측정 → Redis 전환 → 결과 비교 기록"으로 변경
   - Task 1의 `GET /steps`를 M8 서버 구현 범위에 추가
   - Phase A 완료 기준 중 오프라인 항목에 Task 2 결과 반영
-- [ ] W2-Q1·W2-Q2 결정을 `docs/week2/TODO.md` 상단 또는 별도 결정 기록에서 참조
+- [x] W2-Q1·W2-Q2 결정을 `docs/week2/TODO.md` 상단 또는 별도 결정 기록에서 참조
 
 ### Task 5. 마무리
 
