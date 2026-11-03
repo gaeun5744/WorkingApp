@@ -39,7 +39,7 @@ internal class AndroidStepDataSource @Inject constructor(
                 override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) = Unit
             }
             // 배칭(maxReportLatency)을 걸지 않는다. 삼성 기기에서 30초 배칭을 요청하면 HAL 이 걸음 변화를
-            // 모아 띄엄띄엄 보고해 화면이 실시간으로 갱신되지 않았다 (docs/architecture.md §3 디버깅 기록).
+            // 모아 띄엄띄엄 보고해 화면이 실시간으로 갱신되지 않았다 (docs/week2/architecture.md §3 디버깅 기록).
             // 누적 카운터라 중간 이벤트를 놓쳐도 최신 값이 전체를 담고, non-wakeup 센서라 화면이 꺼지면 CPU 를 깨우지 않는다.
             manager.registerListener(listener, stepSensor, SensorManager.SENSOR_DELAY_NORMAL)
             awaitClose { manager.unregisterListener(listener) }
@@ -49,11 +49,15 @@ internal class AndroidStepDataSource @Inject constructor(
     // event.timestamp 는 부팅 이후 경과 시간(ns)이라, 늦게 전달된 만큼을 현재 시각에서 빼 실제 측정 시각을 구한다.
     // 센서를 등록하면 직전 값이 즉시 다시 전달되는데(실기기에서 239초 전 값 확인), 이 값도 원래 측정 시각으로 기록된다
     private fun SensorEvent.toReading(): StepReading {
-        val delayNanos = (SystemClock.elapsedRealtimeNanos() - timestamp).coerceAtLeast(0)
+        val now = clock.instant()
+        val sinceBootNanos = SystemClock.elapsedRealtimeNanos()
+        val delayNanos = (sinceBootNanos - timestamp).coerceAtLeast(0)
         return StepReading(
             rawCount = values[0].toLong(),
             bootCount = readBootCount(),
-            timestamp = clock.instant().minusNanos(delayNanos),
+            timestamp = now.minusNanos(delayNanos),
+            // 재부팅 후 첫 측정이 늦어지면 걸음은 부팅 이후 구간 어딘가에서 생긴 것이다 (StepDeltaCalculator 측정 공백)
+            bootTime = now.minusNanos(sinceBootNanos),
         )
     }
 
