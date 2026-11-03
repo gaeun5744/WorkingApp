@@ -24,7 +24,7 @@ import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import java.time.Duration
 import java.time.OffsetDateTime
 
-/** 격자 칸 기반 보물상자 생성·열기 검증 규칙 (`docs/api.md` 보물상자 절). */
+/** 격자 칸 기반 보물상자 생성·열기 검증 규칙 (`docs/week2/api.md` 보물상자 절). */
 class MockTreasureTest {
 
     private val json = Json { ignoreUnknownKeys = true }

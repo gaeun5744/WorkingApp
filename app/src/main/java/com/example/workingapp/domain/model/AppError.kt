@@ -11,7 +11,7 @@ sealed class AppError : Exception() {
     /** 인증을 복구하지 못함 */
     data object Unauthorized : AppError()
 
-    /** 요청 값 오류 (400). [code] 는 `docs/api.md` 에러 코드 */
+    /** 요청 값 오류 (400). [code] 는 `docs/week2/api.md` 에러 코드 */
     data class InvalidRequest(val code: String) : AppError()
 
     data object Unknown : AppError()

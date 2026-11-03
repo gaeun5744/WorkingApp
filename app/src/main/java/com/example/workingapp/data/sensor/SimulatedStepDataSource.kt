@@ -34,6 +34,7 @@ internal class SimulatedStepDataSource @Inject constructor(
                         StepReading.UNKNOWN_BOOT_COUNT,
                     ),
                     timestamp = clock.instant(),
+                    bootTime = clock.instant().minusMillis(SystemClock.elapsedRealtime()),
                 ),
             )
             delay(EMIT_INTERVAL_MILLIS)

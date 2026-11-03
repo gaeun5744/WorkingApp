@@ -29,7 +29,7 @@ fun AppNavHost(
 
     // 불변식: 백스택은 비면 안 된다 (NavDisplay 가 IllegalArgumentException 으로 종료).
     // M7 에뮬레이터 확인 중 동네 선택 결과를 돌려준 직후 한 번 "backstack cannot be empty" 크래시가 났지만
-    // 재현하지 못해 원인을 찾지 못했다 (docs/architecture.md §8). 마지막 화면은 빼지 않고, 그런 시도가 있으면 기록한다.
+    // 재현하지 못해 원인을 찾지 못했다 (docs/week2/architecture.md §8). 마지막 화면은 빼지 않고, 그런 시도가 있으면 기록한다.
     val pop: (from: String) -> Unit = { from ->
         if (backStack.size > 1) {
             backStack.removeLastOrNull()

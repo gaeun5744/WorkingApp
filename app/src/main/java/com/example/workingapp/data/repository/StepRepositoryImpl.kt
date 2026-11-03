@@ -54,7 +54,7 @@ internal class StepRepositoryImpl @Inject constructor(
         // 서비스와 워커가 동시에 기록해도 체크포인트를 읽고-계산하고-쓰는 과정이 섞이지 않도록 한 트랜잭션으로 묶는다
         database.withTransaction {
             val calculation = calculator.calculate(dao.getCheckpoint()?.toDomain(), reading)
-            calculation.delta?.let { addSteps(it) }
+            calculation.deltas.forEach { addSteps(it) }
             dao.upsertCheckpoint(calculation.checkpoint.toEntity())
         }
     }

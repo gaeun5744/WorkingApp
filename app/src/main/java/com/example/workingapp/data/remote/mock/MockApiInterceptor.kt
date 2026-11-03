@@ -9,6 +9,7 @@ import com.example.workingapp.data.remote.dto.RegionsResponse
 import com.example.workingapp.data.remote.dto.RewardClaimRequest
 import com.example.workingapp.data.remote.dto.RewardClaimResponse
 import com.example.workingapp.data.remote.dto.RewardsTodayResponse
+import com.example.workingapp.data.remote.dto.StepsResponse
 import com.example.workingapp.data.remote.dto.StepsSyncRequest
 import com.example.workingapp.data.remote.dto.StepsSyncResponse
 import com.example.workingapp.data.remote.dto.TokenResponse
@@ -85,6 +86,11 @@ internal class MockApiInterceptor @Inject constructor(
                 request.withBody(StepsSyncRequest.serializer()) { body ->
                     request.respond(server.syncSteps(userId, body), StepsSyncResponse.serializer())
                 }
+            }
+            "GET" to "/steps" -> request.authorized(authorization) { userId ->
+                val from = request.url.queryParameter("from")
+                val to = request.url.queryParameter("to")
+                request.respond(server.getSteps(userId, from, to), StepsResponse.serializer())
             }
             "GET" to "/rewards/today" -> request.authorized(authorization) { userId ->
                 request.respond(server.getTodayRewards(userId), RewardsTodayResponse.serializer())

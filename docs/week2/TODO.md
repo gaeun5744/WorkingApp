@@ -1,13 +1,14 @@
 # 만보기 앱 클론 — 구현 TODO
 
 > 당근 만보기를 참고해 **앱 시스템 디자인**을 연습하기 위한 프로젝트.
-> 요구사항과 모든 결정의 근거(선택하지 않은 대안 포함)는 `docs/PRD.md`가 기준이다. 이 문서는 "무엇을 어떤 순서로 만들지"만 다룬다.
+> 2주차 기준 (`docs/week1/TODO.md` 복사본 + 2주차 변경: Redis 도입 시점 W2-Q1, `GET /steps` W2-Q2 — `docs/week2/PLAN.md`).
+> 요구사항과 모든 결정의 근거(선택하지 않은 대안 포함)는 `docs/week1/PRD.md`가 기준이다. 이 문서는 "무엇을 어떤 순서로 만들지"만 다룬다.
 > Android 작업은 `.agents/AGENTS.md` 지침을, 서버 작업은 `.agents/llm-rules/server/`(Phase B에서 작성) 지침을 따른다.
 
 - 구현 순서 (PRD Q17): **Phase A — 앱을 Mock 서버로 완성** → **Phase B — 실제 서버 구현 후 전환**
 - 브랜치 전략: `main`(릴리스 가능한 상태) ← `develop`(통합) ← `feature/*`(마일스톤 단위). 각 마일스톤이 끝나면 `develop`에 `--no-ff` 머지 후 다음 브랜치를 딴다.
 - 커밋 메시지 설명은 한국어로 작성하고, 커밋/푸시는 명시적으로 요청할 때만 한다.
-- 저장소 구조: 루트 = Android 앱(`:app`), `server/` = 독립 Gradle 프로젝트(Phase B). DTO는 공유하지 않고 `docs/api.md`가 계약의 기준.
+- 저장소 구조: 루트 = Android 앱(`:app`), `server/` = 독립 Gradle 프로젝트(Phase B). DTO는 공유하지 않고 `docs/week1/api.md`가 계약의 기준.
 
 ## 기술 스택
 
@@ -15,7 +16,7 @@
 |---|---|
 | 앱 | 단일 모듈 `:app`, Kotlin, Compose(Material3), Hilt, Retrofit + OkHttp + kotlinx.serialization, Navigation 3 + `ResultEventBus`, Timber, Room, SharedPreferences(세션), DataStore(설정), WorkManager, Foreground Service |
 | Mock 서버 (Phase A) | 앱 내부 OkHttp `MockApiInterceptor` (PRD Q18) |
-| 서버 (Phase B) | Spring Boot (Kotlin), Spring Data JPA + 네이티브 upsert, Flyway, PostgreSQL, Redis, JWT |
+| 서버 (Phase B) | Spring Boot (Kotlin), Spring Data JPA + 네이티브 upsert, Flyway, PostgreSQL, JWT. Redis는 M10에서 측정 후 결정 (W2-Q1) |
 | 인프라 (Phase B) | Docker Compose(로컬·운영 동일), VM 1대, Caddy(HTTPS), GitHub Actions |
 | 외부 (Phase B) | Play Integrity API (Play Console 내부 테스트 트랙 + Google Cloud 프로젝트) |
 
@@ -23,8 +24,8 @@
 
 ## M0. Interview & PRD ✅
 
-- [x] 범위 / 비범위, 수용 기준, 엣지 케이스, 의존성 확정 → `docs/PRD.md` §1~7
-- [x] 되돌리기 어려운 결정 grilling (Q1~Q18) → `docs/PRD.md` PRD Interview
+- [x] 범위 / 비범위, 수용 기준, 엣지 케이스, 의존성 확정 → `docs/week1/PRD.md` §1~7
+- [x] 되돌리기 어려운 결정 grilling (Q1~Q18) → `docs/week1/PRD.md` PRD Interview
 
 ---
 
@@ -68,9 +69,9 @@ service              Foreground Service, BootReceiver       ← 지침 확장
 worker               WorkManager Worker                     ← 지침 확장
 ```
 
-- [x] `docs/architecture.md`에 구성도, 지침 확장 근거, Mock → 실제 서버 전환 방법 기록
+- [x] `docs/week1/architecture.md`에 구성도, 지침 확장 근거, Mock → 실제 서버 전환 방법 기록
 
-### 1-3. API 계약 `docs/api.md` ★ (앱·Mock·서버 공통 기준)
+### 1-3. API 계약 `docs/week1/api.md` ★ (앱·Mock·서버 공통 기준)
 - [x] 공통: 인증 헤더(`Authorization: Bearer`), 에러 응답 형식, 날짜 형식(KST `yyyy-MM-dd`)
 - [x] 엔드포인트별 요청/응답·에러 코드 + DTO·`PedometerApi`로 코드화
   - `POST /auth/anonymous` — 익명 가입 + 토큰 발급
@@ -85,7 +86,7 @@ worker               WorkManager Worker                     ← 지침 확장
   - `GET /ranking?period=daily|weekly` — 내 동네 랭킹 (상위 50 + 내 순위)
 
 ### 1-4. Mock 서버 (`data/remote/mock`)
-- [x] `MockApiInterceptor`: 경로·메서드별로 `docs/api.md` 형식의 JSON 응답 생성
+- [x] `MockApiInterceptor`: 경로·메서드별로 `docs/week1/api.md` 형식의 JSON 응답 생성
 - [x] `BuildConfig.USE_MOCK_API` 플래그로 `NetworkModule`에서 Interceptor 장착 여부 결정 (Phase A는 모든 빌드 true)
 - [x] 메모리 상태로 서버 규칙 흉내
   - 걸음: 날짜별 `max(기존, 새 값)` 반영, 하루/시간당 상한 자르기
@@ -99,7 +100,7 @@ worker               WorkManager Worker                     ← 지침 확장
 
 ## M2. 걸음 측정 & 로컬 저장 (`feature/m2-step-sensor`) ✅
 
-설계 결정과 대안은 `docs/architecture.md` §3.
+설계 결정과 대안은 `docs/week1/architecture.md` §3.
 
 ### 2-1. 누적값 → 걸음 변환 (`domain/step`) ★
 - [x] 측정마다 증분(현재 − 직전)을 측정 시각(KST)의 날짜·시간대에 더하는 `StepDeltaCalculator` (baseline 방식 대신)
@@ -118,7 +119,7 @@ worker               WorkManager Worker                     ← 지침 확장
 - [x] 권한: `ACTIVITY_RECOGNITION`, `FOREGROUND_SERVICE_HEALTH`, `POST_NOTIFICATIONS`, `RECEIVE_BOOT_COMPLETED`
   - 권한 요청은 Route에서 처리하고 ViewModel에는 결과만 전달
   - 1차 홈 화면: 오늘 걸음 / 권한 필요 / 센서 미지원 / 로딩
-- [x] 검증: 에뮬레이터에서 강제 종료·재부팅 후 걸음 유지 (`docs/architecture.md` §3 검증)
+- [x] 검증: 에뮬레이터에서 강제 종료·재부팅 후 걸음 유지 (`docs/week1/architecture.md` §3 검증)
 - [x] 실제 기기(SM-S916N, STEP_COUNTER 하드웨어)에서 사용자가 직접 설치·확인 — 권한 허용, FGS(type=health) 실행, 크래시 없음
 
 ### 2-3. 로컬 저장소
@@ -134,7 +135,7 @@ worker               WorkManager Worker                     ← 지침 확장
 
 ## M3. 인증 & 동기화 (Mock) (`feature/m3-auth-sync`) ✅
 
-설계 결정과 대안은 `docs/architecture.md` §4, 재가입 정책은 PRD Q19.
+설계 결정과 대안은 `docs/week1/architecture.md` §4, 재가입 정책은 PRD Q19.
 
 - [x] API 구현 순서 준수: DTO → Mapper → Domain → Repository 인터페이스 → 구현체 → DI → ViewModel → Screen
 - [x] `NetworkModule`: 일반 클라이언트(`AuthInterceptor` → Mock) + 갱신 전용 `@AuthClient` 클라이언트, `PedometerApi`에서 인증 헤더 파라미터 제거
@@ -152,7 +153,7 @@ worker               WorkManager Worker                     ← 지침 확장
 
 ## M4. 화면: 홈 & 기록 (`feature/m4-home-history`) ✅
 
-설계 결정과 대안은 `docs/architecture.md` §5.
+설계 결정과 대안은 `docs/week1/architecture.md` §5.
 
 - [x] 홈: 오늘 걸음 + 원형 진행 바, 거리/칼로리/시간 환산, 목표 변경(다이얼로그)
 - [x] `HomeViewModel`: 걸음 Flow + 목표 + 권한을 `combine` → `stateIn`
@@ -167,7 +168,7 @@ worker               WorkManager Worker                     ← 지침 확장
 
 ## M5. 리워드 & 지갑 (Mock) (`feature/m5-reward-wallet`) ✅
 
-설계 결정과 대안은 `docs/architecture.md` §6.
+설계 결정과 대안은 `docs/week1/architecture.md` §6.
 
 - [x] 홈에 리워드 구간 버튼 (잠김 / 받기 / 받음, M4에서 이동) — "받음"은 서버, "받기 가능"은 기기 걸음 기준
 - [x] 수령 전 최신 걸음 동기화 → 수령 API (Play Integrity 토큰은 Phase B에서 추가)
@@ -181,14 +182,14 @@ worker               WorkManager Worker                     ← 지침 확장
 
 ## M6. 동네걷기 지도 & 보물상자 (Mock) (`feature/m6-walk-map`) ✅
 
-원본 당근 "동네걷기"의 지도 미션을 참고한다 (PRD Q20~Q25). 설계 결정과 대안은 `docs/architecture.md` §7.
+원본 당근 "동네걷기"의 지도 미션을 참고한다 (PRD Q20~Q25). 설계 결정과 대안은 `docs/week1/architecture.md` §7.
 
 ### 6-1. 사전 준비
 - [x] 네이버 클라우드 플랫폼 Maps Client ID (사용자 발급) → `local.properties`의 `NAVER_MAP_CLIENT_ID` → `manifestPlaceholders` → `com.naver.maps.map.NCP_KEY_ID`
 - [x] 네이버 지도 SDK 3.24.0 + `play-services-location` 21.3.0, `libnavermap.so` 16KB 정렬 확인 (LOAD·RELRO 모두 정렬)
 
 ### 6-2. API 계약 & Mock
-- [x] `docs/api.md`: `GET /treasures/nearby?latitude&longitude`(주변 3×3칸), `POST /treasures/{id}/open`, 에러 코드
+- [x] `docs/week1/api.md`: `GET /treasures/nearby?latitude&longitude`(주변 3×3칸), `POST /treasures/{id}/open`, 에러 코드
 - [x] Mock: 위경도 0.005도 격자 칸마다 (칸, 날짜) 시드로 2개 결정적 생성, id 로 위치 재계산해 검증(날짜 → 멱등 → 하루 5개 상한 → 가짜 GPS → 정확도 → 거리 → 이동 속도), 2P 적립(`TREASURE`)
 - [x] 단위 테스트 (`GeoCellTest` 4, `MockTreasureTest` 9)
 - 변경: 처음에는 동네 중심 반경 1km(Q22)로 구현했으나, 동네(목록 선택)와 실제 위치가 다를 수 있어 동네와 무관한 격자 방식으로 바꿈 (Q25). 동네는 랭킹 전용
@@ -209,7 +210,7 @@ worker               WorkManager Worker                     ← 지침 확장
 
 ## M7. 동네 랭킹 (Mock) (`feature/m7-ranking`) ✅
 
-설계 결정과 대안은 `docs/architecture.md` §8.
+설계 결정과 대안은 `docs/week1/architecture.md` §8.
 
 - [x] 일간/주간 탭, 상위 50 리스트(내 행 강조) + 내 순위 고정 카드, "HH:mm 기준"
 - [x] 5분 메모리 캐시(기간별), 당겨서 새로고침은 캐시 무시, 새로 받을 때 내 걸음 먼저 동기화
@@ -222,7 +223,7 @@ worker               WorkManager Worker                     ← 지침 확장
 ### Phase A 완료 기준
 - [x] 재부팅·강제 종료 후 걸음 유지 (M2 에뮬레이터)
 - [ ] 자정 경계 — 단위 테스트로만 검증 (기기에서 자정을 넘겨 본 적 없음)
-- [ ] 오프라인(비행기 모드) 후 동기화 — 미확인. Mock 재시작에 따른 401 → 재가입 → 재업로드 흐름만 에뮬레이터에서 확인 (M3)
+- [x] 오프라인(비행기 모드) 후 동기화 — 2주차 에뮬레이터 확인 (`docs/week2/scenarios.md`): 오프라인 중 요청 0건, 복구 1.5초 뒤 동기화, 토큰 만료 401 → 갱신 → 성공. 요청 도중 끊김은 Mock으로 재현 불가 → M11
 - [x] 리워드 중복 수령 방지 (M5 에뮬레이터: 연타 시 추가 요청 0건, Mock 멱등)
 - [x] 보물상자 열기·위치 검증 (M6 에뮬레이터: 열기 성공, 순간이동 거부)
 - [x] 랭킹 조회 (M7 에뮬레이터)
@@ -236,7 +237,7 @@ worker               WorkManager Worker                     ← 지침 확장
 
 - [ ] 서버용 에이전트 지침 작성: `.agents/llm-rules/server/` (레이어 구조, JPA·트랜잭션, 예외 처리, 테스트 규칙) + `AGENTS.md` 라우팅 표 갱신
 - [ ] `server/` Spring Boot(Kotlin) 프로젝트 생성 (앱과 독립 Gradle 빌드)
-- [ ] `docker-compose.yml`: Spring Boot + PostgreSQL + Redis
+- [ ] `docker-compose.yml`: Spring Boot + PostgreSQL (Redis는 넣지 않음 — W2-Q1)
 - [ ] 시간대 `Asia/Seoul` 고정, `Clock` 빈 주입
 - [ ] Flyway 초기 스키마
   - `users(id, nickname, region_id, created_at)`
@@ -246,9 +247,10 @@ worker               WorkManager Worker                     ← 지침 확장
   - `hourly_steps(user_id, date, hour, steps)`
   - `reward_claims(id, user_id, date, tier, points, claimed_at)` — UNIQUE `(user_id, date, tier)`
   - `wallets(user_id, balance)` / `wallet_transactions(id, user_id, amount, reason, created_at)`
-- [ ] 공통 에러 응답 형식 (`docs/api.md`와 일치)
+- [ ] 공통 에러 응답 형식 (`docs/week1/api.md`와 일치)
 - [ ] 인증: 익명 가입 → 액세스(1시간) / 리프레시(30일) JWT, Spring Security 필터, 리프레시 토큰 해시 저장 + 교체(rotation)
 - [ ] 걸음 동기화: `INSERT ... ON CONFLICT DO UPDATE SET steps = GREATEST(...)` (멱등)
+- [ ] 걸음 조회 `GET /steps?from&to` (`docs/week2/api.md`, 2주차 추가): `(user_id, date)` PK 범위 조회
 - [ ] 검증 규칙: 하루 100,000 / 시간당 12,000 상한, 미래 날짜·시간대 거부, 최근 7일 밖 거부, 초과분 자르고 `suspicious` 기록
 - [ ] 테스트: 같은 요청 반복, 동시 요청, 경계값 (Testcontainers PostgreSQL)
 
@@ -258,24 +260,38 @@ worker               WorkManager Worker                     ← 지침 확장
 - [ ] 한 트랜잭션에서 `reward_claims` insert(유니크 제약) + 지갑 잔액·내역 갱신, 중복 요청은 기존 결과 반환
 - [ ] Play Console 앱 등록, 내부 테스트 트랙 배포, Google Cloud 프로젝트 연결
 - [ ] 서버: Play Integrity 토큰 검증, 실패 시 지급 거부 / 로컬 개발용 검증 끄기 설정
-- [ ] 앱: 수령 시 Play Integrity 토큰 요청 → `integrityToken` 전송 (`docs/api.md` 필수화)
+- [ ] 앱: 수령 시 Play Integrity 토큰 요청 → `integrityToken` 전송 (`docs/week1/api.md` 필수화)
 - [ ] 테스트: 동시 수령 요청에도 1회만 적립
 - [ ] 보물상자: (격자 칸, 날짜) 결정적 생성, 열기 서버 검증(하루 상한·거리·정확도·가짜 GPS·이동 속도), `(user, treasure)` 유니크로 멱등, 열기 위치·시각 기록
 - [ ] 앱: 보물상자 열기에도 Play Integrity 토큰 첨부
 - [ ] 보물상자 배치 개선 결정: 바다·강 등 걸어갈 수 없는 곳 제외 (장소(POI)·도로 데이터 기반 배치 등, M6 알려진 한계)
 
-## M10. Redis 랭킹 (`feature/server-ranking`) ★
+## M10. 랭킹: DB로 시작 → 측정 → Redis 전환 (`feature/server-ranking`) ★
 
+순서는 W2-Q1 결정(`docs/week2/PLAN.md`): 필요하다는 근거를 측정으로 확인한 뒤 Redis를 도입한다.
+
+### 10-1. PostgreSQL 랭킹
+- [ ] `GET /ranking` 을 `daily_steps` + `users.region_id` 쿼리로 구현 (일간: 날짜 조건 정렬, 주간: 월요일~오늘 합계)
+- [ ] 인덱스 설계 (`(date, steps)`, 동네 조건) + `EXPLAIN ANALYZE` 기록
+
+### 10-2. 부하 측정
+- [ ] 시드 데이터: MAU 10만 가정 (동네 수·동네당 사용자 수 가정 명시)
+- [ ] 부하 테스트 도구 선택 (k6 / Gatling 등, 대안 기록) → 동기화 쓰기 + 랭킹 읽기 동시 부하에서 p95 응답 시간·DB CPU 측정
+- [ ] 판단 기준을 먼저 정하고 측정 (예: 피크 170 RPS에서 랭킹 p95 > 200ms 이면 전환)
+
+### 10-3. Redis 전환 (측정 결과가 기준을 넘을 때만)
+- [ ] `docker-compose.yml`에 Redis 추가
 - [ ] Redis 키: `rank:daily:{regionId}:{date}`, `rank:weekly:{regionId}:{weekStart}` (월요일 시작, KST) + TTL
 - [ ] 걸음 upsert 시 일간 `ZADD GT`, 주간은 실제 증가분만 `ZINCRBY`
 - [ ] 상위 50명 + 내 순위 조회
 - [ ] PostgreSQL → Redis 랭킹 재구축 기능
 - [ ] 테스트: Redis 초기화 후 재구축 결과 일치
+- [ ] 전환 전후 측정값 비교를 `docs/`에 기록 (전환하지 않았다면 그 근거)
 
 ## M11. 앱 Mock → 실제 서버 전환 (`feature/switch-to-server`)
 
 - [ ] `USE_MOCK_API = false`, 빌드 타입별 base URL (로컬 `10.0.2.2` / 운영 HTTPS)
-- [ ] Mock과 실제 서버 응답 차이 점검 (`docs/api.md` 기준), 차이는 계약 문서부터 수정
+- [ ] Mock과 실제 서버 응답 차이 점검 (`docs/week1/api.md` 기준), 차이는 계약 문서부터 수정
 - [ ] `data/remote/mock` 유지 여부 결정 (테스트·데모용으로 debug 전용 유지 vs 삭제)
 - [ ] 검증: 로컬 Docker Compose 서버로 PRD 수용 기준 전체 시나리오
 
@@ -296,11 +312,11 @@ worker               WorkManager Worker                     ← 지침 확장
   - `./gradlew testDebugUnitTest`
   - background work / 권한 / 영속성 변경은 컴파일만으로 완료 처리하지 않고 수동 시나리오 결과 함께 기록
   - `llm-skills/code-simplification.md`로 자가 점검
-  - API 변경 시 `docs/api.md` 먼저 갱신 → Mock 반영
+  - API 변경 시 `docs/week1/api.md` 먼저 갱신 → Mock 반영
 - 서버 (Phase B)
-  - `server/`에서 `./gradlew test` (Testcontainers로 PostgreSQL·Redis 통합 테스트)
+  - `server/`에서 `./gradlew test` (Testcontainers로 PostgreSQL 통합 테스트, Redis는 M10-3 이후)
 - 배터리 사용량 측정 (Android Studio Energy Profiler)
-- [x] 16KB 페이지 호환성: DataStore 1.2.0 → 1.2.1 (RELRO 정렬)로 에뮬레이터 경고 해결 (`docs/architecture.md` 빌드 메모)
+- [x] 16KB 페이지 호환성: DataStore 1.2.0 → 1.2.1 (RELRO 정렬)로 에뮬레이터 경고 해결 (`docs/week1/architecture.md` 빌드 메모)
 - [ ] 16KB: Compose `graphics-path`의 RELRO 미정렬(에뮬레이터는 통과) — Play Console 업로드 시(M9) 검사 결과 확인, 필요하면 대응
 
 ---
@@ -321,7 +337,7 @@ worker               WorkManager Worker                     ← 지침 확장
 | **Phase B** | | |
 | M8 | 서버가 인증과 걸음 업로드를 받는다 | 서버 |
 | M9 | 리워드를 안전하게 지급한다 | 서버 + 앱 + Play Integrity |
-| M10 | Redis로 랭킹을 집계한다 | 서버 + Redis |
+| M10 | 랭킹을 DB로 만들고, 측정해서 필요하면 Redis로 바꾼다 | 서버 (+ Redis) |
 | M11 | 앱이 실제 서버로 동작한다 | 앱 + 서버 |
 | M12 | 운영 서버에서 전체가 동작한다 | 인프라 |
 
