@@ -211,7 +211,7 @@ class WalkMapViewModel @Inject constructor(
     }
 
     private companion object {
-        // 서버 검증(docs/api.md)과 같은 기준. 앱은 버튼 활성화에만 쓰고 최종 판정은 서버가 한다
+        // 서버 검증(docs/week2/api.md)과 같은 기준. 앱은 버튼 활성화에만 쓰고 최종 판정은 서버가 한다
         const val MAX_ACCURACY_METERS = 50f
     }
 }

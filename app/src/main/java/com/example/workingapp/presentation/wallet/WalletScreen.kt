@@ -103,7 +103,7 @@ private fun TransactionRow(transaction: WalletTransaction) {
     }
 }
 
-// 적립 내역에는 구간 번호만 오므로 화면 표시용 걸음 수를 둔다 (docs/api.md 리워드 구간 표와 같게 유지)
+// 적립 내역에는 구간 번호만 오므로 화면 표시용 걸음 수를 둔다 (docs/week2/api.md 리워드 구간 표와 같게 유지)
 private val TIER_STEPS = mapOf(1 to 1_000, 2 to 3_000, 3 to 5_000, 4 to 7_000, 5 to 10_000)
 
 @Preview(showBackground = true)

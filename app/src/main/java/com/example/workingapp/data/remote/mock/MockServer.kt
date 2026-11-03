@@ -10,9 +10,11 @@ import com.example.workingapp.data.remote.dto.RewardClaimResponse
 import com.example.workingapp.data.remote.dto.RewardStatusDto
 import com.example.workingapp.data.remote.dto.RewardTierDto
 import com.example.workingapp.data.remote.dto.RewardsTodayResponse
+import com.example.workingapp.data.remote.dto.StepsResponse
 import com.example.workingapp.data.remote.dto.StepsSyncRequest
 import com.example.workingapp.data.remote.dto.StepsSyncResponse
 import com.example.workingapp.data.remote.dto.StepsSyncResultDto
+import com.example.workingapp.data.remote.dto.StoredDailyStepsDto
 import com.example.workingapp.data.remote.dto.SyncStatusDto
 import com.example.workingapp.data.remote.dto.TokenResponse
 import com.example.workingapp.data.remote.dto.TreasureDto
@@ -39,7 +41,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * `docs/api.md` 의 서버 규칙을 메모리 상태로 흉내 내는 Mock 서버.
+ * `docs/week2/api.md` 의 서버 규칙을 메모리 상태로 흉내 내는 Mock 서버.
  * 상태는 프로세스가 살아 있는 동안만 유지된다 (PRD Q18 알려진 한계).
  * OkHttp 는 여러 스레드에서 요청을 보내므로 모든 상태 접근은 [lock] 안에서 한다.
  */
@@ -175,6 +177,21 @@ internal class MockServer @Inject constructor(
         MockResult.Success(StepsSyncResponse(results))
     }
 
+    fun getSteps(userId: String, from: String?, to: String?): MockResult<StepsResponse> = synchronized(lock) {
+        val fromDate = from?.let(::parseDate)
+        val toDate = to?.let(::parseDate)
+        if (fromDate == null || toDate == null) return validationError("from, to 는 yyyy-MM-dd 형식으로 필요합니다.")
+        if (fromDate.isAfter(toDate) || ChronoUnit.DAYS.between(fromDate, toDate) >= MAX_QUERY_DAYS) {
+            return validationError("조회 기간은 from <= to, 최대 ${MAX_QUERY_DAYS}일입니다.")
+        }
+        val days = dailySteps
+            .filterKeys { it.userId == userId && it.date in fromDate..toDate }
+            .entries
+            .sortedBy { it.key.date }
+            .map { (key, steps) -> StoredDailyStepsDto(key.date.toString(), steps) }
+        MockResult.Success(StepsResponse(days))
+    }
+
     // endregion
 
     // region 리워드 / 지갑
@@ -267,7 +284,7 @@ internal class MockServer @Inject constructor(
             )
         }
 
-    /** 검증 순서는 docs/api.md 와 같다. 이동 속도는 조작할 수 없는 서버 시각으로 계산한다. */
+    /** 검증 순서는 docs/week2/api.md 와 같다. 이동 속도는 조작할 수 없는 서버 시각으로 계산한다. */
     fun openTreasure(userId: String, treasureId: String, request: TreasureOpenRequest): MockResult<TreasureOpenResponse> =
         synchronized(lock) {
             val found = treasureField.find(treasureId)
@@ -366,6 +383,7 @@ internal class MockServer @Inject constructor(
         const val BEARER_PREFIX = "Bearer "
         const val MAX_NICKNAME_LENGTH = 12
         const val SYNC_WINDOW_DAYS = 7L
+        const val MAX_QUERY_DAYS = 31L
         const val HOURLY_CAP = 12_000
         const val DAILY_CAP = 100_000
         const val RANKING_SIZE = 50

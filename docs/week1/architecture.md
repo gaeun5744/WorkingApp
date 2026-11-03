@@ -1,6 +1,6 @@
 # 아키텍처
 
-> 요구사항과 결정 근거는 `docs/PRD.md`, API 계약은 `docs/api.md`를 따른다.
+> 요구사항과 결정 근거는 `docs/week1/PRD.md`, API 계약은 `docs/week1/api.md`를 따른다.
 > 이 문서는 "코드가 실제로 어떻게 구성되는가"를 기록하고, 구현이 진행될 때마다 갱신한다.
 
 ## 1. 전체 구성
@@ -21,7 +21,7 @@
 
 | 패키지 | 역할 | 상태 |
 |---|---|---|
-| `data/remote/api` | Retrofit `PedometerApi` (`docs/api.md`의 코드 표현), 토큰 갱신용 동기 `AuthApi` | M3 ✅ |
+| `data/remote/api` | Retrofit `PedometerApi` (`docs/week1/api.md`의 코드 표현), 토큰 갱신용 동기 `AuthApi` | M3 ✅ |
 | `data/remote/auth` | `AuthInterceptor`(토큰 첨부 + 401 갱신), `AccessTokenRenewer`(리프레시 → 자동 재가입) | M3 ✅ |
 | `data/remote/ApiCall.kt` | Retrofit 예외 → `AppError` 정규화 | M3 ✅ |
 | `data/remote/dto` | `@Serializable` DTO (+ M3부터 `toDomain()` 매퍼) | M1 ✅ |
@@ -282,7 +282,7 @@ PedometerApi(Retrofit) → OkHttpClient
 | 파일 | 책임 |
 |---|---|
 | `MockApiInterceptor` | HTTP 요청을 `MockServer` 호출로 바꾸고 결과를 JSON 응답으로 돌려준다. 인증 헤더 확인, 본문 파싱 실패 시 400 |
-| `MockServer` | `docs/api.md` 규칙 구현: 토큰 발급·rotation·만료, max upsert, 상한 자르기, 리워드 멱등, 랭킹 계산. 모든 상태 접근은 단일 lock 안에서 처리 |
+| `MockServer` | `docs/week1/api.md` 규칙 구현: 토큰 발급·rotation·만료, max upsert, 상한 자르기, 리워드 멱등, 랭킹 계산. 모든 상태 접근은 단일 lock 안에서 처리 |
 | `MockNeighborSteps` | (이웃, 날짜)마다 결정적인 걸음 수를 만들고, 오늘은 시각에 따라 증가 |
 | `MockApiConfig` | 지연 범위, 오류 확률, 토큰 수명. `MockApiModule`에서 제공 (액세스 토큰 10분 — 재발급 흐름 재현용) |
 | `MockResult` | 성공/실패 결과 타입 (예외 대신 값으로 실패를 표현) |
@@ -295,7 +295,7 @@ PedometerApi(Retrofit) → OkHttpClient
 
 1. `app/build.gradle.kts`에서 `USE_MOCK_API = false`, `BASE_URL`을 빌드 타입별 서버 주소로 변경
 2. `AndroidManifest.xml`에 `INTERNET` 권한 추가 (Mock은 실제 네트워크를 쓰지 않아 지금은 없음)
-3. `docs/api.md` 기준으로 Mock과 서버 응답 차이 점검
+3. `docs/week1/api.md` 기준으로 Mock과 서버 응답 차이 점검
 
 ## 10. 빌드 메모
 

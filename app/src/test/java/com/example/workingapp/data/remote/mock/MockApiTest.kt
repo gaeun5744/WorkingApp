@@ -30,7 +30,7 @@ import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import java.time.Duration
 import java.time.OffsetDateTime
 
-/** Retrofit → OkHttp → MockApiInterceptor 전체 경로로 `docs/api.md` 규칙을 검증한다. */
+/** Retrofit → OkHttp → MockApiInterceptor 전체 경로로 `docs/week2/api.md` 규칙을 검증한다. */
 class MockApiTest {
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -184,6 +184,56 @@ class MockApiTest {
         )
         assertError(400, "VALIDATION_ERROR") { api.syncSteps(request) }
         assertEquals(0, api.getTodayRewards().steps)
+    }
+
+    @Test
+    fun `걸음 조회는 기간 안의 기록 있는 날짜만 오름차순으로 준다`() = runTest {
+        signUp()
+        api.syncSteps(
+            StepsSyncRequest(
+                listOf(
+                    DailyStepsDto("2026-10-25", 5_000, emptyList()),
+                    DailyStepsDto("2026-10-21", 3_000, emptyList()),
+                    DailyStepsDto("2026-10-23", 4_000, emptyList()),
+                ),
+            ),
+        )
+
+        // to 가 미래여도 오류가 아니다 (이번 주 조회)
+        val days = api.getSteps(from = "2026-10-22", to = "2026-10-31").days
+
+        assertEquals(listOf("2026-10-23" to 4_000, "2026-10-25" to 5_000), days.map { it.date to it.steps })
+    }
+
+    @Test
+    fun `걸음 조회는 상한과 max 가 적용된 저장값을 준다`() = runTest {
+        signUp()
+        api.syncSteps(day("2026-10-24", 150_000))
+        api.syncSteps(day("2026-10-25", 5_000))
+        api.syncSteps(day("2026-10-25", 3_000))
+
+        val days = api.getSteps(from = "2026-10-24", to = "2026-10-25").days
+
+        assertEquals(listOf(100_000, 5_000), days.map { it.steps })
+    }
+
+    @Test
+    fun `걸음 조회는 다른 사용자의 기록을 주지 않는다`() = runTest {
+        signUp()
+        api.syncSteps(day("2026-10-25", 5_000))
+        signUp()
+
+        assertTrue(api.getSteps(from = "2026-10-25", to = "2026-10-25").days.isEmpty())
+    }
+
+    @Test
+    fun `걸음 조회 기간이 잘못되면 400 VALIDATION_ERROR`() = runTest {
+        signUp()
+        assertError(400, "VALIDATION_ERROR") { api.getSteps(from = "2026-10-25", to = "2026-10-24") }
+        assertError(400, "VALIDATION_ERROR") { api.getSteps(from = "2026-09-01", to = "2026-10-02") }
+        assertError(400, "VALIDATION_ERROR") { api.getSteps(from = "10/25", to = "2026-10-25") }
+        // 31일(양 끝 포함)은 허용
+        api.getSteps(from = "2026-09-01", to = "2026-10-01")
     }
 
     // endregion

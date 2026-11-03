@@ -7,6 +7,7 @@ import com.example.workingapp.data.remote.dto.RegionsResponse
 import com.example.workingapp.data.remote.dto.RewardClaimRequest
 import com.example.workingapp.data.remote.dto.RewardClaimResponse
 import com.example.workingapp.data.remote.dto.RewardsTodayResponse
+import com.example.workingapp.data.remote.dto.StepsResponse
 import com.example.workingapp.data.remote.dto.StepsSyncRequest
 import com.example.workingapp.data.remote.dto.StepsSyncResponse
 import com.example.workingapp.data.remote.dto.TokenResponse
@@ -23,7 +24,7 @@ import retrofit2.http.Path
 import retrofit2.http.Query
 
 /**
- * `docs/api.md` 계약의 Retrofit 표현.
+ * `docs/week2/api.md` 계약의 Retrofit 표현.
  * 인증 헤더와 401 갱신은 `AuthInterceptor` 가 처리한다.
  */
 interface PedometerApi {
@@ -42,6 +43,10 @@ interface PedometerApi {
 
     @POST("steps/sync")
     suspend fun syncSteps(@Body request: StepsSyncRequest): StepsSyncResponse
+
+    /** [from]·[to] 는 KST `yyyy-MM-dd`, 양 끝 포함 최대 31일. */
+    @GET("steps")
+    suspend fun getSteps(@Query("from") from: String, @Query("to") to: String): StepsResponse
 
     @GET("rewards/today")
     suspend fun getTodayRewards(): RewardsTodayResponse
