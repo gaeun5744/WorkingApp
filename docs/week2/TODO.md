@@ -3,7 +3,7 @@
 > 당근 만보기를 참고해 **앱 시스템 디자인**을 연습하기 위한 프로젝트.
 > 2주차 기준 (`docs/week1/TODO.md` 복사본 + 2주차 변경: Redis 도입 시점 W2-Q1, `GET /steps` W2-Q2 — `docs/week2/PLAN.md`).
 > 요구사항과 모든 결정의 근거(선택하지 않은 대안 포함)는 `docs/week1/PRD.md`가 기준이다. 이 문서는 "무엇을 어떤 순서로 만들지"만 다룬다.
-> Android 작업은 `.agents/AGENTS.md` 지침을, 서버 작업은 `.agents/llm-rules/server/`(Phase B에서 작성) 지침을 따른다.
+> Android 작업은 `AGENTS.md` 지침을, 서버 작업은 `.agents/llm-rules/server/`(Phase B에서 작성) 지침을 따른다.
 
 - 구현 순서 (PRD Q17): **Phase A — 앱을 Mock 서버로 완성** → **Phase B — 실제 서버 구현 후 전환**
 - 브랜치 전략: `main`(릴리스 가능한 상태) ← `develop`(통합) ← `feature/*`(마일스톤 단위). 각 마일스톤이 끝나면 `develop`에 `--no-ff` 머지 후 다음 브랜치를 딴다.
@@ -47,7 +47,7 @@
 - [x] 검증: `./gradlew :app:assembleDebug`
 - [x] 에뮬레이터 실행 확인 (Pixel 8 API 37: 5개 화면 이동 + 뒤로가기, 크래시 없음)
 
-### 1-2. 앱 패키지 구조 (`llm-rules/data/layer-contract.md` + 확장)
+### 1-2. 앱 패키지 구조 (`.agents/llm-rules/data/layer-contract.md` + 확장)
 
 의존 방향: `presentation → domain ← data`. **UseCase 레이어 없이 ViewModel이 Repository를 직접 호출한다.**
 
@@ -311,7 +311,7 @@ worker               WorkManager Worker                     ← 지침 확장
   - `./gradlew :app:compileDebugKotlin` (또는 `:app:assembleDebug`)
   - `./gradlew testDebugUnitTest`
   - background work / 권한 / 영속성 변경은 컴파일만으로 완료 처리하지 않고 수동 시나리오 결과 함께 기록
-  - `llm-skills/code-simplification.md`로 자가 점검
+  - `.claude/skills/code-simplification/SKILL.md`로 자가 점검
   - API 변경 시 `docs/week1/api.md` 먼저 갱신 → Mock 반영
 - 서버 (Phase B)
   - `server/`에서 `./gradlew test` (Testcontainers로 PostgreSQL 통합 테스트, Redis는 M10-3 이후)

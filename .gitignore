@@ -21,3 +21,9 @@ local.properties
 /.idea/vcs.xml
 /.idea/deploymentTargetSelector.xml
 /.idea/misc.xml
+
+# AI 에이전트 설정 (로컬 전용, git 추적 안 함)
+.claude/
+.agents/
+AGENTS.md
+CLAUDE.md
