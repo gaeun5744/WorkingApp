@@ -135,7 +135,7 @@ Phase A(앱 + Mock 서버)로 이미 구현된 부분이 많으므로, 새 기�
 
 ### Task 5. 마무리
 
-- [ ] 셀프 점검 (`.agents/llm-skills/code-simplification.md`)
+- [ ] 셀프 점검 (`.claude/skills/code-simplification/SKILL.md`)
 - [ ] `develop`에 `--no-ff` 머지
 - [ ] Phase A 완료 기준(자정 경계 확인 여부 포함)을 정리하고 `develop` → `main` 머지 여부 결정
 
