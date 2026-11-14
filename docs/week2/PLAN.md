@@ -175,9 +175,9 @@ Phase A(앱 + Mock 서버)로 이미 구현된 부분이 많으므로, 새 기�
 
 ### Task 5. 마무리
 
-- [ ] 셀프 점검 (`.claude/skills/code-simplification/SKILL.md`)
-- [ ] `develop`에 `--no-ff` 머지
-- [ ] Phase A 완료 기준(자정 경계 확인 여부 포함)을 정리하고 `develop` → `main` 머지 여부 결정
+- [x] 셀프 점검 (`.claude/skills/code-simplification/SKILL.md`) — 지적 4개 중 2개 반영(2026-11-14): `StepReading.bootTime` 필수화, `spread()`의 `Pair`를 `HourSlot`으로. 반영하지 않음: `getSteps` 호출처 없음(W2-Q2 의도), `SYNC_WINDOW_DAYS` 앱·Mock 중복(Mock은 서버를 흉내 내는 쪽)
+- [x] `develop`에 `--no-ff` 머지 (1b3991c)
+- [x] Phase A 완료 기준(자정 경계 확인 여부 포함)을 정리하고 `develop` → `main` 머지 여부 결정 — 자정 경계를 에뮬레이터로 확인(시나리오 E)한 뒤 머지 (2026-11-14)
 
 ## 이번 주 범위가 아닌 것
 
