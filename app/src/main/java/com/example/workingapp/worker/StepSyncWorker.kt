@@ -57,7 +57,7 @@ class StepSyncWorker @AssistedInject constructor(
                 .enqueueUniquePeriodicWork(PERIODIC_NAME, ExistingPeriodicWorkPolicy.KEEP, request)
         }
 
-        /** 앱 진입·온보딩 완료 시 즉시 한 번 동기화한다. */
+        /** 프로세스 시작·온보딩 완료 시 즉시 한 번 동기화한다 (앱 진입마다는 하지 않음, docs/week2/PLAN.md W2-Q4). */
         fun syncNow(context: Context) {
             val request = OneTimeWorkRequestBuilder<StepSyncWorker>()
                 .setConstraints(constraints)
