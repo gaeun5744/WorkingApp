@@ -41,11 +41,7 @@ class StepDeltaCalculator(private val zone: ZoneId) {
         val steps = if (rebooted) reading.rawCount else reading.rawCount - previous.rawCount
         if (steps <= 0) return StepCalculation(deltas = emptyList(), checkpoint = checkpoint)
 
-        val gapStart = if (rebooted && reading.bootTime != null) {
-            maxOf(previous.timestamp, reading.bootTime)
-        } else {
-            previous.timestamp
-        }
+        val gapStart = if (rebooted) maxOf(previous.timestamp, reading.bootTime) else previous.timestamp
         val deltas = if (Duration.between(gapStart, reading.timestamp) > GAP_THRESHOLD) {
             spread(steps, gapStart, reading.timestamp)
         } else {
@@ -64,26 +60,29 @@ class StepDeltaCalculator(private val zone: ZoneId) {
      * 내림한 뒤 남은 걸음은 나머지가 큰 칸부터 1보씩 더해 합계가 정확히 [steps]가 되게 한다 (최대 나머지 방식).
      */
     private fun spread(steps: Long, start: Instant, end: Instant): List<StepDelta> {
-        val slots = mutableListOf<Pair<Instant, Long>>() // (칸 시작, 칸 길이 ms)
+        val slots = mutableListOf<HourSlot>()
         var slotStart = start
         while (slotStart < end) {
             val nextHour = slotStart.atZone(zone).truncatedTo(ChronoUnit.HOURS).plusHours(1).toInstant()
             val slotEnd = minOf(nextHour, end)
-            slots += slotStart to Duration.between(slotStart, slotEnd).toMillis()
+            slots += HourSlot(start = slotStart, millis = Duration.between(slotStart, slotEnd).toMillis())
             slotStart = slotEnd
         }
-        val totalMillis = slots.sumOf { it.second }
-        val shares = slots.map { (_, millis) -> steps * millis / totalMillis }.toMutableList()
+        val totalMillis = slots.sumOf { it.millis }
+        val shares = slots.map { slot -> steps * slot.millis / totalMillis }.toMutableList()
         val leftover = (steps - shares.sum()).toInt()
         slots.indices
-            .sortedByDescending { index -> (steps * slots[index].second) % totalMillis }
+            .sortedByDescending { index -> (steps * slots[index].millis) % totalMillis }
             .take(leftover)
             .forEach { index -> shares[index] += 1 }
 
         return slots.zip(shares)
             .filter { (_, share) -> share > 0 }
-            .map { (slot, share) -> deltaAt(slot.first, share) }
+            .map { (slot, share) -> deltaAt(slot.start, share) }
     }
+
+    /** 공백 구간을 시간대 경계로 자른 한 칸. [millis]는 그 칸이 구간 안에서 차지하는 길이. */
+    private data class HourSlot(val start: Instant, val millis: Long)
 
     private companion object {
         /** 정상 동작 중의 최대 측정 간격(15분 스냅샷 워커)보다 넉넉히 길게 잡는다. */

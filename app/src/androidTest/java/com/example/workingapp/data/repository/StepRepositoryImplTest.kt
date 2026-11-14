@@ -62,7 +62,7 @@ class StepRepositoryImplTest {
     @After
     fun tearDown() = database.close()
 
-    private fun reading(raw: Long, boot: Int = 1) = StepReading(raw, boot, now)
+    private fun reading(raw: Long, boot: Int = 1) = StepReading(raw, boot, now, bootTime = Instant.EPOCH)
 
     @Test
     fun 첫_측정은_기준만_저장하고_이후_증분을_날짜와_시간대에_더한다() = runTest {

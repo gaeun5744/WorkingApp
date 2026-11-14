@@ -15,8 +15,9 @@ class StepDeltaCalculatorTest {
 
     private fun kst(dateTime: String): Instant = OffsetDateTime.parse("$dateTime+09:00").toInstant()
 
-    private fun reading(raw: Long, boot: Int = 1, at: String = "2026-10-25T10:00:00", bootedAt: String? = null) =
-        StepReading(rawCount = raw, bootCount = boot, timestamp = kst(at), bootTime = bootedAt?.let(::kst))
+    // bootedAt 기본값은 모든 체크포인트보다 앞선 시각이라 재부팅 구간 시작이 직전 측정 시각이 된다
+    private fun reading(raw: Long, boot: Int = 1, at: String = "2026-10-25T10:00:00", bootedAt: String = "2026-10-01T00:00:00") =
+        StepReading(rawCount = raw, bootCount = boot, timestamp = kst(at), bootTime = kst(bootedAt))
 
     private fun checkpoint(raw: Long, boot: Int = 1, at: String = "2026-10-25T09:00:00") =
         CounterCheckpoint(rawCount = raw, bootCount = boot, timestamp = kst(at))
@@ -74,7 +75,12 @@ class StepDeltaCalculatorTest {
     @Test
     fun `날짜와 시간대는 기기 시간대와 무관하게 KST 기준이다`() {
         // UTC 2026-10-25 15:30 = KST 2026-10-26 00:30
-        val reading = StepReading(rawCount = 1_100, bootCount = 1, timestamp = Instant.parse("2026-10-25T15:30:00Z"))
+        val reading = StepReading(
+            rawCount = 1_100,
+            bootCount = 1,
+            timestamp = Instant.parse("2026-10-25T15:30:00Z"),
+            bootTime = Instant.EPOCH,
+        )
         val result = calculator.calculate(checkpoint(raw = 1_000, at = "2026-10-26T00:00:00"), reading)
 
         assertEquals(listOf(StepDelta(LocalDate.of(2026, 10, 26), hour = 0, steps = 100)), result.deltas)
