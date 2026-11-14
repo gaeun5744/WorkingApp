@@ -1,0 +1,71 @@
+package com.example.workingapp.data.remote.api
+
+import com.example.workingapp.data.remote.dto.AnonymousSignUpRequest
+import com.example.workingapp.data.remote.dto.MeResponse
+import com.example.workingapp.data.remote.dto.RankingResponse
+import com.example.workingapp.data.remote.dto.RegionsResponse
+import com.example.workingapp.data.remote.dto.RewardClaimRequest
+import com.example.workingapp.data.remote.dto.RewardClaimResponse
+import com.example.workingapp.data.remote.dto.RewardsTodayResponse
+import com.example.workingapp.data.remote.dto.StepsResponse
+import com.example.workingapp.data.remote.dto.StepsSyncRequest
+import com.example.workingapp.data.remote.dto.StepsSyncResponse
+import com.example.workingapp.data.remote.dto.TokenResponse
+import com.example.workingapp.data.remote.dto.TreasureOpenRequest
+import com.example.workingapp.data.remote.dto.TreasureOpenResponse
+import com.example.workingapp.data.remote.dto.TreasuresNearbyResponse
+import com.example.workingapp.data.remote.dto.UpdateRegionRequest
+import com.example.workingapp.data.remote.dto.WalletResponse
+import retrofit2.http.Body
+import retrofit2.http.GET
+import retrofit2.http.POST
+import retrofit2.http.PUT
+import retrofit2.http.Path
+import retrofit2.http.Query
+
+/**
+ * `docs/week2/api.md` 계약의 Retrofit 표현.
+ * 인증 헤더와 401 갱신은 `AuthInterceptor` 가 처리한다.
+ */
+interface PedometerApi {
+
+    @POST("auth/anonymous")
+    suspend fun signUpAnonymous(@Body request: AnonymousSignUpRequest): TokenResponse
+
+    @GET("me")
+    suspend fun getMe(): MeResponse
+
+    @GET("regions")
+    suspend fun searchRegions(@Query("query") query: String): RegionsResponse
+
+    @PUT("me/region")
+    suspend fun updateRegion(@Body request: UpdateRegionRequest): MeResponse
+
+    @POST("steps/sync")
+    suspend fun syncSteps(@Body request: StepsSyncRequest): StepsSyncResponse
+
+    /** [from]·[to] 는 KST `yyyy-MM-dd`, 양 끝 포함 최대 31일. */
+    @GET("steps")
+    suspend fun getSteps(@Query("from") from: String, @Query("to") to: String): StepsResponse
+
+    @GET("rewards/today")
+    suspend fun getTodayRewards(): RewardsTodayResponse
+
+    @POST("rewards/claim")
+    suspend fun claimReward(@Body request: RewardClaimRequest): RewardClaimResponse
+
+    @GET("wallet")
+    suspend fun getWallet(): WalletResponse
+
+    @GET("treasures/nearby")
+    suspend fun getNearbyTreasures(
+        @Query("latitude") latitude: Double,
+        @Query("longitude") longitude: Double,
+    ): TreasuresNearbyResponse
+
+    @POST("treasures/{id}/open")
+    suspend fun openTreasure(@Path("id") treasureId: String, @Body request: TreasureOpenRequest): TreasureOpenResponse
+
+    @GET("ranking")
+    suspend fun getRanking(@Query("period") period: String): RankingResponse
+}

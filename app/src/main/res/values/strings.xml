@@ -1,3 +1,125 @@
 <resources>
     <string name="app_name">WorkingApp</string>
+
+    <string name="screen_history">기록</string>
+    <string name="screen_ranking">동네 랭킹</string>
+    <string name="screen_wallet">지갑</string>
+    <string name="screen_region_select">동네 선택</string>
+
+    <string name="notification_channel_step_tracking">걸음 측정</string>
+    <string name="notification_today_steps">오늘 %,d걸음</string>
+
+    <string name="home_today_steps">%,d</string>
+    <string name="home_goal">목표 %,d보</string>
+    <string name="home_goal_dialog_title">하루 목표 걸음</string>
+    <string name="home_goal_option">%,d보</string>
+    <string name="home_metric_distance">%.1f km</string>
+    <string name="home_metric_distance_label">거리</string>
+    <string name="home_metric_kcal">%,d kcal</string>
+    <string name="home_metric_kcal_label">칼로리</string>
+    <string name="home_metric_minutes">%,d분</string>
+    <string name="home_metric_minutes_label">걸은 시간</string>
+    <string name="home_permission_title">걸음을 세려면 권한이 필요해요</string>
+    <string name="home_permission_description">신체 활동 권한을 허용하면 앱을 닫아도 걸음을 계속 측정해요. 알림 권한을 허용하면 오늘 걸음을 알림에서 볼 수 있어요.</string>
+    <string name="home_permission_request">권한 허용하기</string>
+    <string name="home_permission_open_settings">설정에서 허용하기</string>
+    <string name="home_sensor_unavailable_title">걸음 센서가 없는 기기예요</string>
+    <string name="home_sensor_unavailable_description">이 기기에서는 걸음을 측정할 수 없어요.</string>
+
+    <string name="onboarding_nickname_title">이웃에게 보일 닉네임을 정해 주세요</string>
+    <string name="onboarding_nickname_label">닉네임</string>
+    <string name="onboarding_nickname_counter">%1$d/%2$d</string>
+    <string name="onboarding_next">다음</string>
+    <string name="onboarding_region_title">%1$s님, 어느 동네에서 걷나요?</string>
+    <string name="onboarding_region_description">같은 동네 이웃과 걸음 수를 비교할 수 있어요.</string>
+    <string name="onboarding_select_region">동네 선택하기</string>
+
+    <string name="region_search_placeholder">동네 이름으로 검색</string>
+    <string name="region_empty">검색 결과가 없어요</string>
+
+    <string name="reward_title">오늘의 걸음 리워드</string>
+    <string name="reward_tier_steps">%,d보</string>
+    <string name="reward_tier_points">%dP</string>
+    <string name="reward_tier_claimed">받음</string>
+    <string name="reward_load_failed">리워드를 불러오지 못했어요</string>
+    <string name="reward_claimed">%1$dP 적립! 잔액 %2$dP</string>
+    <string name="reward_already_claimed">이미 받은 리워드예요</string>
+    <string name="reward_error_not_reached">서버에 아직 걸음이 반영되지 않았어요. 잠시 후 다시 시도해 주세요</string>
+    <string name="reward_error_not_today">날짜가 바뀌었어요. 오늘 리워드를 확인해 주세요</string>
+
+    <string name="ranking_title">%1$s 랭킹</string>
+    <string name="ranking_change_region">동네 변경</string>
+    <string name="ranking_daily">오늘</string>
+    <string name="ranking_weekly">이번 주</string>
+    <string name="ranking_my_rank">내 순위 %d위</string>
+    <string name="ranking_steps">%,d보</string>
+    <string name="ranking_me_suffix">%1$s (나)</string>
+    <string name="ranking_fetched_at">%1$02d:%2$02d 기준</string>
+    <string name="ranking_region_not_set">랭킹을 보려면 동네를 정해 주세요</string>
+
+    <string name="screen_walk_map">동네걷기</string>
+    <string name="treasure_opened">보물상자에서 %1$dP 적립! 잔액 %2$dP</string>
+    <string name="treasure_already_opened">이미 연 보물상자예요</string>
+    <string name="treasure_error_too_far">보물상자에 조금 더 가까이 가 주세요</string>
+    <string name="treasure_error_low_accuracy">위치가 정확하지 않아요. 하늘이 보이는 곳에서 다시 시도해 주세요</string>
+    <string name="treasure_error_mock_location">가짜 위치로는 열 수 없어요</string>
+    <string name="treasure_error_too_fast">이동이 너무 빨라요. 잠시 후 다시 시도해 주세요</string>
+    <string name="treasure_error_daily_limit">오늘 열 수 있는 보물상자를 모두 열었어요</string>
+    <string name="treasure_error_not_today">날짜가 바뀌어 새 보물상자를 불러왔어요</string>
+    <string name="walk_map_title">내 주변 보물상자</string>
+    <string name="walk_map_progress">오늘 %1$d/%2$d개 열었어요</string>
+    <string name="walk_map_nearest">가장 가까운 상자까지 %,dm</string>
+    <string name="walk_map_all_opened">오늘 열 수 있는 보물상자를 모두 열었어요! 내일 또 만나요</string>
+    <string name="walk_map_locating">내 위치를 찾고 있어요</string>
+    <string name="walk_map_open">상자 열기 (+%dP)</string>
+    <string name="walk_map_open_hint">%dm 안으로 들어가면 열 수 있어요</string>
+    <string name="walk_map_permission_title">보물상자를 찾으려면 위치가 필요해요</string>
+    <string name="walk_map_permission_description">이 화면이 열려 있을 때만 위치를 사용해요.</string>
+    <string name="walk_map_permission_request">위치 권한 허용하기</string>
+    <string name="walk_map_precise_required">정확한 위치를 허용해야 상자를 열 수 있어요</string>
+    <string name="walk_map_open_settings">설정에서 변경하기</string>
+    <string name="walk_map_load_failed">보물상자를 불러오지 못했어요</string>
+
+    <string name="wallet_balance">%,dP</string>
+    <string name="wallet_balance_label">내 포인트</string>
+    <string name="wallet_history">적립 내역</string>
+    <string name="wallet_empty">아직 적립 내역이 없어요</string>
+    <string name="wallet_reason_reward_tier">%,d보 리워드</string>
+    <string name="wallet_reason_treasure">보물상자</string>
+    <string name="wallet_reason_other">적립</string>
+    <string name="wallet_amount">+%dP</string>
+    <string name="wallet_date_time">%1$d월 %2$d일 %3$02d:%4$02d</string>
+
+    <string-array name="history_periods">
+        <item>일</item>
+        <item>주</item>
+        <item>월</item>
+    </string-array>
+    <string-array name="history_weekdays">
+        <item>월</item>
+        <item>화</item>
+        <item>수</item>
+        <item>목</item>
+        <item>금</item>
+        <item>토</item>
+        <item>일</item>
+    </string-array>
+    <string name="history_previous">‹ 이전</string>
+    <string name="history_next">다음 ›</string>
+    <string name="history_date">%1$d월 %2$d일</string>
+    <string name="history_week_range">%1$d월 %2$d일 ~ %3$d월 %4$d일</string>
+    <string name="history_month">%1$d년 %2$d월</string>
+    <string name="history_total">합계</string>
+    <string name="history_average">일 평균</string>
+    <string name="history_goal">목표</string>
+    <string name="history_steps_value">%,d보</string>
+    <string name="history_achieved_days">%d일 달성</string>
+    <string name="history_goal_achieved">달성</string>
+    <string name="history_goal_not_achieved">미달성</string>
+
+    <string name="close">닫기</string>
+    <string name="retry">다시 시도</string>
+    <string name="error_network">네트워크 연결을 확인해 주세요</string>
+    <string name="error_server">잠시 후 다시 시도해 주세요</string>
+    <string name="error_unknown">문제가 생겼어요. 다시 시도해 주세요</string>
 </resources>
