@@ -251,7 +251,7 @@ worker               WorkManager Worker                     ← 지침 확장
 - [ ] 인증: 익명 가입 → 액세스(1시간) / 리프레시(30일) JWT, Spring Security 필터, 리프레시 토큰 해시 저장 + 교체(rotation)
 - [ ] 걸음 동기화: `INSERT ... ON CONFLICT DO UPDATE SET steps = GREATEST(...)` (멱등)
 - [ ] 걸음 조회 `GET /steps?from&to` (`docs/week2/api.md`, 2주차 추가): `(user_id, date)` PK 범위 조회
-- [ ] 검증 규칙: 하루 100,000 / 시간당 12,000 상한, 미래 날짜·시간대 거부, 최근 7일 밖 거부, 초과분 자르고 `suspicious` 기록
+- [ ] 검증 규칙: 하루 100,000 / 시간당 12,000 상한, 미래 날짜·시간대 거부, 최근 7일 밖 거부(근거 W2-Q3), 초과분 자르고 `suspicious` 기록
 - [ ] 테스트: 같은 요청 반복, 동시 요청, 경계값 (Testcontainers PostgreSQL)
 
 ## M9. 리워드 & Play Integrity (`feature/server-reward`) ★
